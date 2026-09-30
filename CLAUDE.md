@@ -4,11 +4,25 @@
 
 Guerra Mínima es un juego web mobile-first de estrategia asíncrona. El prototipo v0.1 funciona sin backend: un jugador humano contra un rival automático.
 
+## NEXO — invariante de producto
+
+Guerra Mínima es estrategia online para jugar con amigos sin presión temporal. Toda actualización debe respetar estas reglas:
+
+- no usar temporizadores, urgencia artificial ni cierre automático de ronda;
+- un turno puede durar varios minutos o quedar pendiente hasta que el jugador vuelva;
+- inspeccionar el mapa, consultar información, hacer zoom, revisar historial y planificar no consume acciones;
+- priorizar decisiones legibles y reflexivas sobre velocidad de ejecución;
+- el jugador cierra el turno explícitamente cuando considera que terminó;
+- el multiplayer futuro debe ser asíncrono o semi-asíncrono y tolerar ausencias sin castigo;
+- si una mejora acelera el ritmo pero reduce la posibilidad de observar y pensar, contradice el producto.
+
+Frase guía: **Guerra Mínima no intenta que juegues rápido; intenta que siempre tengas algo interesante que pensar.**
+
 Principios actuales:
 - vista isométrica tipo RTS clásico;
 - mapa más grande que la pantalla y cámara por drag/touch;
 - partidas largas y tranquilas;
-- 3 acciones por turno;
+- 6 acciones por turno en v0.6.0, sin reloj ni cierre automático;
 - moneda única para reforzar y fortificar;
 - países reales aleatorios como identidad visual, sin bonificaciones nacionales;
 - continente procedural con valle central y tres puestos estratégicos;
@@ -64,3 +78,8 @@ Cómic psicodélico con tinta negra, verde ácido, ocre/naranja y azul; paneles 
 
 ## Campaña v0.5.0
 Reglas actuales en README y guía in-game: tres puestos, hitos únicos, escudos consumibles y refuerzos gratuitos. La victoria solo ocurre por cuartel o 60% del territorio. Fortificar está dentro de Tienda / más opciones, fuera de las acciones principales. Mantener la vista del mapa amplia y evitar paneles negros innecesarios.
+
+
+## Dirección de turno v0.6.0
+
+La ronda humana tiene 6 acciones, planificación gratuita de hasta 5 sectores, parte rival navegable y confirmación de cierre. El tutorial guiado de 12 pasos forma parte del producto. No convertir herramientas de lectura o planificación en costes de acción.
