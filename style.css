@@ -89,3 +89,13 @@ dialog::backdrop { background:rgba(14,20,15,.62); backdrop-filter:blur(2px); }
   .country strong { max-width:220px; font-size:14px; }
   .actions button { height:56px; font-size:9px; }
 }
+.zoom-controls { position:absolute; right:10px; top:10px; display:grid; gap:4px; z-index:3; }
+.zoom-controls button { width:36px; height:36px; border:1px solid #7d7967; border-radius:8px; background:rgba(239,233,215,.92); font:900 20px/1 system-ui,sans-serif; }
+.secondary-btn { width:100%; margin-top:14px; border:1px solid #746d5a; border-radius:6px; background:#ddd3ba; padding:10px; font:800 11px system-ui,sans-serif; }
+#helpDialog { max-height:82vh; overflow:auto; }
+.help-block { margin-top:12px; }
+.help-block p { margin:0; padding:8px 0; border-top:1px solid rgba(0,0,0,.1); font:500 11px/1.42 system-ui,sans-serif; }
+.help-block p:first-child { border-top:0; }
+.changelog { margin-top:10px; padding:10px; border:1px solid rgba(0,0,0,.14); border-radius:7px; background:rgba(255,255,255,.25); }
+.changelog small { font:900 8px system-ui,sans-serif; letter-spacing:.13em; }
+.changelog p { margin:4px 0 0; font:600 10px/1.4 system-ui,sans-serif; }
