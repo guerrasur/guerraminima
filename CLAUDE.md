@@ -21,6 +21,17 @@ Guerra Mínima es un juego web mobile-first de estrategia por turnos. La demo ac
 
 Frase guía: **Guerra Mínima no intenta que juegues rápido; intenta que siempre tengas algo interesante que pensar.**
 
+## v0.8.0
+
+- Tienda siempre visible junto a la selección; no volver a esconderla como opción secundaria.
+- El saldo debe estar visible en el acceso a Tienda.
+- Cada turno nuevo con acciones rivales genera un resumen compacto sobre el mapa.
+- Ese resumen debe persistir si el jugador cierra y vuelve antes de leerlo.
+- El historial RIVAL completo sigue disponible y sus eventos centran el mapa.
+- No usar el resumen rival como temporizador ni como bloqueo: informa y se puede descartar.
+- Una nueva release no debe forzar a repetir el tutorial completo a quien ya lo completó.
+- Si Orden extra está activa, el HUD expresa el presupuesto ampliado (7/7, 6/7, etc.).
+
 ## v0.7.0
 
 - 6 acciones base;
@@ -41,7 +52,7 @@ No convertir REPLANTEAR en una forma de repetir azar.
 
 ## Loop prioritario
 
-**leer el parte → inspeccionar mapa → marcar PLAN → probar distribución → replantear si hace falta → ejecutar/reforzar/mover/expandir/atacar → revisar el frente → cerrar voluntariamente.**
+**leer el resumen rival de llegada → inspeccionar mapa → marcar PLAN → probar distribución → replantear si hace falta → ejecutar/reforzar/mover/expandir/atacar → revisar el frente → cerrar voluntariamente.**
 
 Antes de sumar tecnologías, diplomacia, clases de unidad o árboles complejos, validar que este loop sea interesante.
 
