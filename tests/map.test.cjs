@@ -346,3 +346,39 @@ test('tutorial covers the full v0.7 loop and documentation locks the NEXO',()=>{
   assert.ok(readme.includes('sin presión'));
   assert.ok(claude.includes('NEXO — INVARIANTE PRINCIPAL'));
 });
+
+
+test('v0.8 puts the store in the live turn UI and keeps the initial reinforce label correct',()=>{
+  const dir=path.join(__dirname,'..');
+  const html=fs.readFileSync(path.join(dir,'index.html'),'utf8');
+  const selection=html.slice(html.indexOf('<section id="selection"'),html.indexOf('</section>',html.indexOf('<section id="selection"'))+10);
+  const menu=html.slice(html.indexOf('<dialog id="menuDialog"'),html.indexOf('</dialog>',html.indexOf('<dialog id="menuDialog"'))+9);
+  assert.ok(selection.includes('id="storeBtn"'));
+  assert.ok(!menu.includes('id="storeBtn"'));
+  assert.ok(html.includes('id="reinforceLabel">Reforzar +2'));
+});
+
+test('v0.8 extra order reports the expanded action budget as 7/7',()=>{
+  const {run}=setup();
+  run('state.resources.money=20;buyExtraOrder();syncUI()');
+  assert.equal(run('el("apLabel").textContent'),'7/7');
+});
+
+test('v0.8 creates a persistent arrival briefing after the rival turn',()=>{
+  const {run}=setup();
+  run('endTurn()');
+  assert.equal(run('state.rivalBriefingTurn'),run('state.turn'));
+  assert.equal(run('state.rivalBriefingSeen'),false);
+  assert.equal(run('rivalBriefingVisible()'),true);
+  run('acknowledgeRivalBriefing()');
+  assert.equal(run('state.rivalBriefingSeen'),true);
+  assert.equal(run('rivalBriefingVisible()'),false);
+});
+
+test('v0.8 migrates an existing saved rival report into an unread briefing',()=>{
+  const {run}=setup();
+  run('delete state.rivalBriefingTurn;delete state.rivalBriefingSeen;state.lastRivalReport=[{text:"Movimiento previo",tile:state.enemyCapital}];let saved=JSON.stringify(state);localStorage.getItem=()=>saved;load()');
+  assert.equal(run('state.rivalBriefingTurn'),run('state.turn'));
+  assert.equal(run('state.rivalBriefingSeen'),false);
+  assert.equal(run('rivalBriefingVisible()'),true);
+});
