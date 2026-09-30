@@ -158,3 +158,66 @@ dialog,.update-card { background:#0b0c09; color:#fffbea; border:2px solid #fffbe
 h3 { font-size:12px; color:#bbed3d; margin-top:20px; }
 @media(max-height:650px) { .campaign { margin-top:3px; padding-top:3px; } .selection { min-height:58px; } .title-row h1 { font-size:17px; } .actions button { height:44px; } }
 @media(prefers-reduced-motion:reduce) { *, *::before, *::after { transition:none !important; } }
+
+
+/* v0.6.0 — NEXO: turnos sin presión, planificación y tutorial */
+.turn-pill { min-width:96px; }
+.turn-pill small { white-space:nowrap; }
+.map-tools {
+  max-width:calc(100% - 58px);
+  overflow-x:auto;
+  scrollbar-width:none;
+  padding-bottom:2px;
+}
+.map-tools::-webkit-scrollbar { display:none; }
+.map-tools button { white-space:nowrap; flex:none; }
+.map-tools button:disabled { opacity:.35; }
+#planBtn:not(:disabled) { border-color:#62e8ff; color:#62e8ff; }
+#reportBtn { border-color:#ffb52b; }
+
+.report-list { display:grid; gap:6px; margin-top:10px; }
+.report-event {
+  width:100%; text-align:left; border:1px solid #6f715f; border-radius:5px;
+  background:#151d10; color:#fffbea; padding:9px 10px; font:600 11px/1.35 system-ui,sans-serif;
+}
+.report-event b { color:#bbed3d; margin-right:5px; }
+.empty-report { font:600 11px/1.45 system-ui,sans-serif; opacity:.72; }
+.primary-btn {
+  width:100%; margin-top:12px; border:2px solid #fffbea; border-radius:6px;
+  background:#ffb52b; color:#0b0c09; padding:11px; font:900 11px system-ui,sans-serif;
+}
+
+.tutorial-panel {
+  position:fixed; z-index:120; left:max(10px,env(safe-area-inset-left));
+  right:max(10px,env(safe-area-inset-right)); bottom:max(10px,env(safe-area-inset-bottom));
+  margin:auto; width:min(520px,calc(100vw - 20px)); padding:13px;
+  background:#0b0c09; color:#fffbea; border:2px solid #62e8ff; border-radius:8px;
+  box-shadow:0 16px 70px rgba(0,0,0,.6);
+}
+.tutorial-panel[hidden] { display:none; }
+.tutorial-top { display:flex; justify-content:space-between; align-items:center; }
+.tutorial-top small { color:#62e8ff; font:900 9px system-ui,sans-serif; letter-spacing:.13em; }
+.tutorial-top button { border:0; background:transparent; color:#fffbea; font:26px/1 system-ui,sans-serif; min-width:38px; min-height:38px; }
+.tutorial-panel h2 { margin:0 0 5px; font-size:18px; }
+.tutorial-panel p { margin:0; font:600 12px/1.45 system-ui,sans-serif; }
+.tutorial-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:11px; }
+.tutorial-actions button {
+  border:1px solid #fffbea; border-radius:5px; background:#151d10; color:#fffbea;
+  min-height:40px; font:900 10px system-ui,sans-serif;
+}
+.tutorial-actions button:last-child { background:#62e8ff; color:#0b0c09; border-color:#62e8ff; }
+.tutorial-focus {
+  position:relative;
+  z-index:110 !important;
+  outline:3px solid #62e8ff !important;
+  outline-offset:3px !important;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.18);
+}
+#mapShell.tutorial-focus { box-shadow:inset 0 0 0 3px #62e8ff; }
+
+@media(max-width:520px) {
+  .map-tools { right:48px; }
+  .map-tools button { min-height:32px; padding:5px 8px; font-size:9px; }
+  .turn-pill { min-width:82px; }
+  .turn-pill small { font-size:6px; }
+}
