@@ -47,3 +47,8 @@ Al publicar una versión, actualizar juntos:
 4. El nombre de caché y URLs versionadas de \`sw.js\`.
 
 No borrar ni renombrar \`guerra-minima-save-v1\` salvo que exista una migración explícita del estado guardado.
+
+
+## Regla de documentación de mecánicas
+
+Toda mecánica o control nuevo debe documentarse también dentro de la guía/changelog del juego. La explicación debe indicar qué hace, coste, alcance o límite y condiciones de uso. La guía debe seguir disponible desde el menú y mostrarse una vez al entrar a cada versión nueva.
