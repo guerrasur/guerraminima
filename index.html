@@ -7,7 +7,7 @@
   <meta name="description" content="Guerra Mínima — prototipo de estrategia asíncrona." />
   <title>Guerra Mínima</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./style.css?v=0.5.0" />
+  <link rel="stylesheet" href="./style.css?v=0.6.0" />
 </head>
 <body>
   <main id="app">
@@ -25,7 +25,7 @@
           <span id="playerFlag" class="flag">🏳️</span>
           <div><strong id="playerCountry">—</strong><small>+ VOS</small></div>
         </div>
-        <div class="turn-pill"><span id="dayLabel">Día 1</span><b id="apLabel">3/3</b><small>acciones</small></div>
+        <div class="turn-pill"><span id="dayLabel">Día 1</span><b id="apLabel">6/6</b><small>acciones · sin reloj</small></div>
         <div class="country enemy-country">
           <div><strong id="enemyCountry">—</strong><small>× RIVAL</small></div>
           <span id="enemyFlag" class="flag">🏳️</span>
@@ -42,7 +42,7 @@
         <button id="zoomInBtn" aria-label="Acercar">+</button>
         <button id="zoomOutBtn" aria-label="Alejar">−</button>
       </div>
-      <div class="map-tools"><button id="objectiveBtn">★ PUESTOS</button></div>
+      <div class="map-tools"><button id="objectiveBtn">★ PUESTOS</button><button id="planBtn">＋ PLAN</button><button id="clearPlanBtn">LIMPIAR</button><button id="reportBtn">☷ RIVAL</button></div>
       <div id="threatLabel" class="threat-label"></div>
       <button id="centerBtn" class="center-btn">⌖</button>
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -64,7 +64,7 @@
     </nav>
 
     <footer class="turn-footer">
-      <div id="lastEvent">Elegí hasta 3 acciones.</div>
+      <div id="lastEvent">Sin reloj: mirá, pensá y cerrá cuando quieras.</div>
       <button id="endTurnBtn">TERMINAR TURNO</button>
     </footer>
   </main>
@@ -74,39 +74,62 @@
       <div><small>DEMO LOCAL · CONTRA IA</small><h2>Partida</h2></div>
       <button data-close="menu">×</button>
     </div>
-    <button id="helpBtn" class="secondary-btn">Ver reglas y cambios</button>
+    <button id="tutorialBtn" class="secondary-btn">Tutorial completo · aprender de pe a pa</button>
+    <button id="helpBtn" class="secondary-btn">Reglas y referencia rápida</button>
     <button id="storeBtn" class="secondary-btn">Tienda / más opciones</button>
     <button id="newGameBtn" class="danger-btn">Generar un continente nuevo</button>
-    <p class="dialog-copy">La partida se guarda automáticamente en este dispositivo. El rival juega sus 3 acciones después de que terminás tu turno.</p>
-    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.5.0</b></div>
+    <p class="dialog-copy">La partida se guarda automáticamente en este dispositivo. El rival juega después de que cerrás tu turno. No existe temporizador: una ronda puede durar varios minutos o quedar esperando hasta que vuelvas.</p>
+    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.6.0</b></div>
   </dialog>
 
   <dialog id="helpDialog">
     <div class="dialog-head">
-      <div><small>GUÍA · v0.5.0</small><h2>Cómo se juega</h2></div>
+      <div><small>REGLAS · v0.6.0</small><h2>Cómo se juega</h2></div>
       <button data-close="help">×</button>
     </div>
-    <div class="changelog"><small>NUEVO EN v0.5.0 · PUNTOS CALIENTES</small>
+    <div class="changelog"><small>NUEVO EN v0.6.0 · TURNO SIN APURO</small>
       <ol>
-        <li><b>Tres puestos ★.</b> Paso Oeste, Valle Central y Paso Este. Se conquistan igual que cualquier territorio y sirven como objetivos de expansión.</li>
-        <li><b>Fortificaciones.</b> Están en Tienda / más opciones. Elegí un territorio propio y gastá ¤4 + 1 acción. Su escudo absorbe la próxima tirada perdida al defender y se rompe sin bajas. Máximo 1 escudo por sector; podés reconstruirlo. Borde celeste = fortificado.</li>
-        <li><b>Hitos con recompensa.</b> Controlar 30 territorios, tomar un puesto y controlar dos puestos dan +¤6 cada uno, una sola vez por bando.</li>
-        <li><b>Mapa e información.</b> Estrellas sobre los puestos, aviso de sectores amenazados y destinos celestes al mover. PUESTOS recorre los tres objetivos sin gastar acciones.</li>
-        <li><b>Rival con rumbo.</b> Busca los puestos y fortifica objetivos expuestos.</li>
+        <li><b>6 acciones.</b> Hay más margen para inspeccionar, reorganizar, expandir y pelear dentro de una misma ronda. No hay reloj ni cierre automático.</li>
+        <li><b>PLAN.</b> Marcá gratis hasta 5 sectores numerados para pensar una secuencia o recordar amenazas. No consume acciones y se limpia al cerrar turno.</li>
+        <li><b>Parte RIVAL.</b> Guarda los movimientos importantes del último turno enemigo. Tocá un evento y saltás directamente al sector.</li>
+        <li><b>Cierre protegido.</b> Terminar turno muestra cuántas acciones quedan y te recuerda que no hay apuro.</li>
+        <li><b>Tutorial completo.</b> Doce pasos guiados desde el objetivo y la lectura del mapa hasta economía, combate, planificación y victoria.</li>
       </ol>
     </div>
+    <button id="tutorialFromHelpBtn" class="secondary-btn">ABRIR TUTORIAL COMPLETO</button>
     <div class="help-block">
-      <p><b>Tu primer objetivo.</b> Tocá PUESTOS para ubicar el más cercano. Reforzá tu frontera y expandite en esa dirección. Después disputá el puesto central. Vigilá tu cuartel.</p>
-      <p><b>3 acciones.</b> Expandir, reforzar, mover o atacar gastan 1 acción. Fortificar también gasta 1 acción y cuesta ¤4 desde Tienda. Reforzar es gratis. Terminar turno hace jugar al rival.</p>
-      <p><b>Expandir.</b> Seleccioná un neutral adyacente a tus tierras. El vecino propio con más tropas necesita al menos 2: transfiere 1 al nuevo sector.</p>
-      <p><b>Reforzar.</b> Seleccioná cualquier territorio propio. Suma 1 tropa gratis y gasta 1 acción.</p>
-      <p><b>Mover.</b> Elegí un territorio propio con al menos 2 tropas, tocá Mover y luego un vecino propio. Transfiere 1 tropa y siempre deja al menos 1 atrás. Otro destino cancela.</p>
-      <p><b>Atacar.</b> Seleccioná un rival adyacente a un territorio propio con al menos 2 tropas. Ataca el vecino propio con más tropas; la selección muestra cuál. Cada lado tira 1d6, empate favorece al defensor: probabilidad de ganar la tirada 15/36 (42%). El perdedor pierde 1 tropa, salvo escudo defensor. Si el defensor llega a 0, conquistás con 1 tropa de tu origen.</p>
-      <p><b>Monedas.</b> Cada turno cobrás el mayor entre ¤2 y tus territorios divididos por 5, redondeado hacia abajo. Los hitos son pagos únicos; las tropas no cuestan monedas.</p>
-      <p><b>Amenaza.</b> El aviso cuenta tus sectores que el rival puede atacar con sus tropas actuales. No predice qué elegirá hacer. Blanco punteado = neutral conquistable; rojo punteado = rival atacable.</p>
-      <p><b>Controles.</b> Arrastrá para mover la cámara, pellizcá para zoom o usá +/−. ⌖ vuelve a tu cuartel. La cámara no consume acciones. Tu partida anterior se conserva y recibe los puestos.</p>
+      <p><b>NEXO.</b> Guerra Mínima es estrategia online para jugar con amigos sin presión. El turno puede durar segundos o varios minutos. La gracia es observar, comparar, planificar y cerrar cuando vos decidís.</p>
+      <p><b>Objetivo.</b> El cuartel rival es la meta principal. También existe victoria territorial al 60% en esta demo. Los puestos ★, monedas y fortificaciones son herramientas para construir ventaja.</p>
+      <p><b>Acciones.</b> Expandir, reforzar, mover y atacar cuestan 1 acción. Reforzar suma +1 tropa gratis. Fortificar cuesta ¤4 + 1 acción desde Tienda.</p>
+      <p><b>Expandir.</b> Neutral adyacente; un vecino propio necesita 2+ tropas y transfiere 1 al nuevo sector.</p>
+      <p><b>Mover.</b> Desde un territorio propio con 2+ tropas a un vecino propio; mueve 1 y deja al menos 1 atrás.</p>
+      <p><b>Atacar.</b> Seleccioná un rival adyacente. Ataca tu vecino con más tropas. 1d6 contra 1d6; empate favorece al defensor. El perdedor pierde 1 tropa salvo escudo.</p>
+      <p><b>Monedas.</b> Ingreso por territorio e hitos. Las tropas normales no cuestan monedas. La tienda se reserva para ventajas especiales.</p>
+      <p><b>Leer al rival.</b> Rojo punteado = atacable. El aviso de amenaza cuenta sectores que el rival podría atacar ahora. RIVAL muestra qué hizo en su último turno.</p>
+      <p><b>PLAN.</b> Es una libreta sobre el mapa: hasta 5 marcas numeradas, sin coste. No ejecuta movimientos ni altera el azar; sólo te ayuda a pensar.</p>
+      <p><b>Controles.</b> Arrastrar mueve cámara; pellizcar o +/− hace zoom; ⌖ vuelve al cuartel. Ninguna de estas acciones consume puntos.</p>
     </div>
   </dialog>
+
+  <dialog id="reportDialog">
+    <div class="dialog-head"><div><small>ÚLTIMO TURNO ENEMIGO</small><h2>Parte rival</h2></div><button data-close="report">×</button></div>
+    <p class="dialog-copy">Tocá un evento para cerrar este parte y centrar el mapa en el sector correspondiente.</p>
+    <div id="reportBody" class="report-list"></div>
+  </dialog>
+
+  <dialog id="endTurnDialog">
+    <div class="dialog-head"><div><small>SIN RELOJ</small><h2>¿Cerrar tu turno?</h2></div><button data-close="endturn">×</button></div>
+    <p id="endTurnCopy" class="dialog-copy"></p>
+    <button id="confirmEndTurnBtn" class="primary-btn">SÍ, CERRAR TURNO</button>
+    <button data-close="endturn" class="secondary-btn">VOLVER A PENSAR</button>
+  </dialog>
+
+  <div id="tutorialPanel" class="tutorial-panel" hidden>
+    <div class="tutorial-top"><small id="tutorialCounter">1/12</small><button id="tutorialClose" aria-label="Cerrar tutorial">×</button></div>
+    <h2 id="tutorialTitle">Tutorial</h2>
+    <p id="tutorialText"></p>
+    <div class="tutorial-actions"><button id="tutorialPrev">ANTERIOR</button><button id="tutorialNext">SIGUIENTE</button></div>
+  </div>
 
   <dialog id="storeDialog">
     <div class="dialog-head"><div><small>OPCIONES</small><h2>Tienda</h2></div><button data-close="store" aria-label="Cerrar tienda">×</button></div>
@@ -132,6 +155,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=0.5.0"></script>
+  <script type="module" src="./app.js?v=0.6.0"></script>
 </body>
 </html>
