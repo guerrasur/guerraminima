@@ -19,6 +19,25 @@ Esta es la regla principal de producto y está por encima de cualquier feature i
 
 Frase guía: **Guerra Mínima no intenta que juegues rápido; intenta que siempre tengas algo interesante que pensar.**
 
+## v0.9.0 — Cada posición cuenta
+
+- **Marcha táctica:** hasta 3 pasos ortogonales por territorio propio conectado, cantidad elegible, 1 acción; siempre queda una tropa en origen. No cruza costa, neutrales ni enemigos. Los destinos posibles se marcan en celeste y se puede cancelar sin gastar.
+- **Flanqueo:** dos o más vecinos del atacante con al menos 2 tropas cada uno dan +1 al dado de ataque. Máximo +1, para ambos bandos.
+- **Cobertura:** bosque y colinas dan +1 al dado defensor. El escudo se mantiene como protección de una tirada perdida y se puede combinar con cobertura.
+- **Previsualización y resultados:** origen elegible, probabilidad calculada sobre las 36 tiradas posibles, consecuencias explícitas y tarjeta descartable con dados y resultado. Opciones permite revisar el último combate incluso después de recargar.
+- **Puestos productivos:** cada puesto controlado suma +¤2 al ingreso al comenzar el turno. Perderlo elimina ese ingreso futuro; no entrega monedas inmediatamente ni gana la partida.
+- **Feedback:** rutas, etiquetas de tropas, conquistas y escudos; sonidos sintetizados opcionales (apagados por defecto); respeta movimiento reducido. Nada de esto desplaza la cámara, consume acciones ni retrasa la lógica.
+- **IA:** redistribuye reservas hacia el frente antes de seguir reforzando. Antes, su rama de movimiento era prácticamente inalcanzable.
+- **Validación:** un ataque o traslado que deja de ser válido entre vista previa y confirmación no consume acciones ni tropas.
+
+### Inspiración y límites
+
+[Into the Breach, Subset Games](https://www.subsetgames.com/itb.html): información para planificar antes de actuar. Se toma esa claridad, manteniendo los dados propios de Guerra Mínima.
+
+[Polytopia: Clear & Hold, Midjiwan](https://polytopia.io/news/strategy-tip-clear-hold/): ocupar una posición también exige defenderla. Aquí se traduce en cobertura, flanqueo y puestos con ingreso recurrente. No se reutilizan recursos gráficos ni código de esos juegos.
+
+Se conservan los saves, las 6 acciones, el refuerzo gratis, PLAN, REPLANTEAR antes del combate, la tienda y el resumen rival. La demo sigue siendo local contra IA.
+
 ## v0.8.0 — Entrar al turno informado
 
 1. **Tienda integrada:** sale del menú y vive junto a la selección, con el saldo visible durante el turno.
@@ -57,7 +76,7 @@ Cada jugador tiene **6 acciones base** y no existe reloj.
 
 - **Expandir:** neutral adyacente; un vecino propio con 2+ tropas transfiere 1 al nuevo sector.
 - **Reforzar:** +2 tropas sobre cualquier territorio propio. 1 acción, ¤0.
-- **Mover:** cantidad elegida entre territorios propios vecinos. 1 acción y al menos 1 tropa queda en origen.
+- **Mover:** cantidad elegida hasta 3 pasos ortogonales conectados por tierra propia. 1 acción y al menos 1 tropa queda en origen.
 - **Atacar:** territorio rival adyacente; la tirada se realiza recién después de la previsualización.
 - **Fortificar:** ¤4 + 1 acción.
 - **Orden extra:** ¤5 para +1 acción, máximo una vez por ronda.
@@ -74,21 +93,30 @@ Al comenzar cada ronda se guarda un baseline interno. Antes de confirmar el prim
 
 ### Combate
 
-Cada lado tira 1d6. El empate favorece al defensor. El perdedor pierde 1 tropa. Una fortificación absorbe una tirada atacante ganada y se rompe. Si el defensor llega a 0, el territorio cambia de dueño con 1 tropa transferida desde el origen. Capturar el cuartel termina la partida.
+Cada lado tira 1d6. Dos o más vecinos atacantes con 2+ tropas dan +1 al atacante (flanqueo, máximo +1). Bosque y colinas dan +1 al defensor (cobertura). El empate de los totales favorece al defensor. El perdedor pierde 1 tropa. Una fortificación absorbe una tirada atacante ganada y se rompe. Si el defensor llega a 0, el territorio cambia de dueño con 1 tropa transferida desde el origen. Capturar el cuartel termina la partida.
 
-La probabilidad del atacante de ganar una tirada es 15/36, aproximadamente 42%.
+Probabilidad de ganar una tirada (no necesariamente conquistar):
+
+| Flanqueo | Cobertura defensiva | Tiradas ganadoras |
+| --- | --- | --- |
+| No | No | 15/36 ≈ 42% |
+| Sí | No | 21/36 ≈ 58% |
+| No | Sí | 10/36 ≈ 28% |
+| Sí | Sí | 15/36 ≈ 42% |
+
+La interfaz usa la misma función de bonificaciones que el combate real. Se elige el origen; perder o conquistar descuenta la tropa de ese origen. Más tropas no mejoran el dado por cantidad, pero permiten resistir más bajas y habilitar flanqueo.
 
 ### Economía
 
 Ingreso por ronda:
 
-`max(2, floor(territorios / 5))`
+`max(2, floor(territorios / 5)) + 2 × puestos controlados`
 
 Las tropas normales no cuestan monedas. Actualmente las monedas sirven para fortificar y comprar una Orden extra. La Tienda está siempre accesible junto a la selección y muestra el saldo; la fortificación se evalúa sobre el sector seleccionado. Los hitos siguen siendo recompensas únicas.
 
 ### Puestos estratégicos
 
-Hay tres puestos ★ en el eje central. Son puntos de interés e hitos de expansión, no una condición adicional de victoria.
+Hay tres puestos ★ en el eje central. Cada uno da +¤2 al inicio del turno de su dueño, además de los hitos únicos. Son posiciones para disputar y sostener, no una condición adicional de victoria.
 
 ### Leer al rival
 
@@ -144,4 +172,4 @@ Una feature visible no está terminada hasta que se explica, aclara coste/alcanc
 node --test tests/map.test.cjs
 ```
 
-GitHub Actions ejecuta la suite en cada push y pull request.
+GitHub Actions ejecuta la suite en cada push y pull request. La suite prueba también las 36 combinaciones de dados de cada bonificación para ambos bandos, rutas de marcha y límites, elección de origen, validación de órdenes, ingreso por puestos, persistencia y replanteo.

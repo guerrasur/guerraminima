@@ -173,11 +173,11 @@ test('reinforce remains free at every turn',()=>{
     assert.equal(run('state.resources.money'),20);
   }
 });
-test('outposts do not alter income and milestones remain one-time rewards',()=>{
+test('outposts add two income each and milestones remain one-time rewards',()=>{
   const {run}=setup();
   const before=run('incomeFor("p")');
   run('for(const i of POSTS.slice(0,2)){state.cells[i].owner="p";state.cells[i].troops=1;}checkVictory()');
-  assert.equal(run('incomeFor("p")'),before);
+  assert.equal(run('incomeFor("p")'),before+4);
   assert.equal(run('state.resources.money'),24);
   run('checkVictory()');
   assert.equal(run('state.winner'),null);
@@ -381,4 +381,117 @@ test('v0.8 migrates an existing saved rival report into an unread briefing',()=>
   assert.equal(run('state.rivalBriefingTurn'),run('state.turn'));
   assert.equal(run('state.rivalBriefingSeen'),false);
   assert.equal(run('rivalBriefingVisible()'),true);
+});
+
+// v0.9 strategic rules: exercise the real resolver for every possible dice pair.
+test('combat preview matches all 36 rolls with cover, flanking and both factions',()=>{
+  const {run}=setup();
+  const results=run(`(()=>{
+    const result=[];const target=idx(20,14),source=idx(19,14),support=idx(21,14);
+    const original=Math.random;
+    try { for(const attacker of ['p','ai']) for(const cover of [false,true]) for(const flank of [false,true]) {
+      let wins=0;
+      for(let a=1;a<=6;a++)for(let d=1;d<=6;d++){
+        state.cells.forEach(c=>{c.owner=null;c.troops=0;c.fort=false;});
+        terrain[target]=cover?'forest':'plains';
+        state.cells[target].owner=attacker==='p'?'ai':'p';state.cells[target].troops=4;
+        state.cells[source].owner=attacker;state.cells[source].troops=4;
+        if(flank){state.cells[support].owner=attacker;state.cells[support].troops=2;}
+        const forecast=combatForecast(attacker,target,source);
+        let roll=0;Math.random=()=>((roll++%2===0?a:d)-.5)/6;
+        const outcome=resolveCombat(attacker,target,source);
+        if(outcome.outcome==='hit')wins++;
+        if(a===6&&d===6)result.push({cover,flank,wins,preview:forecast.wins});
+      }
+    }} finally {Math.random=original;}
+    return result;
+  })()`);
+  for(const r of results){assert.equal(r.wins,r.preview);assert.equal(r.wins,r.cover&&!r.flank?10:r.flank&&!r.cover?21:15);}
+});
+
+test('support needs two troops, never stacks and source choice is honored',()=>{
+  const {run}=setup();
+  run(`state.cells.forEach(c=>{c.owner=null;c.troops=0;});
+    const target=idx(20,14),source=idx(19,14),support=idx(21,14);
+    state.cells[target].owner='ai';state.cells[target].troops=2;
+    state.cells[source].owner='p';state.cells[source].troops=3;
+    state.cells[support].owner='p';state.cells[support].troops=1;`);
+  assert.equal(run('combatForecast("p",target,source).attackBonus'),0);
+  run('state.cells[support].troops=9;selected=target;requestAttack();el("attackSource").value=String(source);refreshAttackPreview();');
+  assert.equal(run('pendingAttack.source'),run('source'));
+  assert.equal(run('combatForecast("p",target,source).attackBonus'),1);
+  run('let roll=0;const oldRandom=Math.random;Math.random=()=>roll++%2===0?0:.99;confirmAttack();Math.random=oldRandom;');
+  assert.equal(run('state.cells[source].troops'),2);
+  assert.equal(run('state.cells[support].troops'),9);
+});
+
+test('invalidated attacks spend no action and do not lock replan',()=>{
+  const {run}=setup();
+  run(`const target=neighbors(state.playerCapital)[0];state.cells[target].owner='ai';state.cells[target].troops=2;
+    captureTurnBaseline();selected=target;requestAttack();state.cells[pendingAttack.source].troops=1;confirmAttack();`);
+  assert.equal(run('state.ap'),6);
+  assert.equal(run('state.turnCombatLocked'),false);
+});
+
+test('march range is three steps; paths cannot cross water, neutral or enemy cells',()=>{
+  const {run}=setup();
+  run(`state.cells.forEach(c=>{c.owner=null;c.troops=0;});
+    const source=idx(10,14);for(let x=10;x<=14;x++){const i=idx(x,14);terrain[i]='plains';state.cells[i].owner='p';state.cells[i].troops=1;}
+    state.cells[source].troops=8;`);
+  assert.equal(run('marchPaths(source,"p").get(idx(13,14)).length'),4);
+  assert.equal(run('marchPaths(source,"p").has(idx(14,14))'),false);
+  for(const owner of ['ai',null]) {
+    run(`state.cells[idx(11,14)].owner=${JSON.stringify(owner)}`);
+    assert.equal(run('marchPaths(source,"p").size'),0);
+  }
+  run('state.cells[idx(11,14)].owner="p";terrain[idx(11,14)]="water"');
+  assert.equal(run('marchPaths(source,"p").size'),0);
+});
+
+test('march transfers the chosen stack for one action and can be replanned',()=>{
+  const {run}=setup();
+  run(`const source=state.playerCapital,target=idx(8,15);captureTurnBaseline();selected=source;beginMove();finishMove(target);
+    el('moveAmount').value='5';confirmMove();`);
+  assert.equal(run('state.cells[source].troops'),1);
+  assert.equal(run('state.cells[target].troops'),6);
+  assert.equal(run('state.ap'),5);
+  assert.equal(run('replanTurn()'),true);
+  assert.equal(run('state.cells[source].troops'),6);
+  assert.equal(run('state.cells[target].troops'),1);
+});
+
+test('march validation prevents moving through a route lost after preview',()=>{
+  const {run}=setup();
+  run(`selected=state.playerCapital;beginMove();const target=neighbors(selected)[0];finishMove(target);state.cells[target].owner='ai';confirmMove();`);
+  assert.equal(run('state.cells[state.playerCapital].troops'),6);
+  assert.equal(run('state.ap'),6);
+  assert.equal(run('pendingMove'),null);
+});
+
+test('AI uses marching before adding new troops when an interior stack can reach its front',()=>{
+  const {run}=setup();
+  run('const originalRandom=Math.random;Math.random=()=>.99;const report=aiTurn();Math.random=originalRandom;');
+  assert.equal(run('report.some(e=>e.text.startsWith("Trasladó"))'),true);
+  assert.equal(run('state.cells.every(c=>!c.owner || c.troops>=1)'),true);
+});
+
+test('new income is paid only on turn start and is lost with ownership',()=>{
+  const {run}=setup();
+  run('const base=incomeFor("p");const oldMoney=state.resources.money;state.cells[POSTS[0]].owner="p";state.cells[POSTS[0]].troops=1;');
+  assert.equal(run('state.resources.money'),run('oldMoney'));
+  assert.equal(run('incomeFor("p")'),run('base+2'));
+  run('grantIncome("p")');
+  assert.equal(run('state.resources.money'),run('oldMoney+base+2'));
+  run('state.cells[POSTS[0]].owner="ai"');
+  assert.equal(run('incomeFor("p")'),run('base'));
+});
+
+test('last combat persists across load and feedback never changes troops or camera',()=>{
+  const {run}=setup();
+  run(`const target=neighbors(state.playerCapital)[0];state.cells[target].owner='ai';state.cells[target].troops=2;selected=target;requestAttack();confirmAttack();
+    const recorded=JSON.stringify(state.lastCombat);let saved=JSON.stringify(state);localStorage.getItem=()=>saved;load();`);
+  assert.equal(run('JSON.stringify(state.lastCombat)'),run('recorded'));
+  const before=run('JSON.stringify({cells:state.cells,camera,ap:state.ap})');
+  run('feedback(state.playerCapital,"+2 tropas","move",[state.playerCapital,target]);drawFeedback();drawFeedback();');
+  assert.equal(run('JSON.stringify({cells:state.cells,camera,ap:state.ap})'),before);
 });

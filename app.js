@@ -1,4 +1,4 @@
-const VERSION = "0.8.0";
+const VERSION = "0.9.0";
 const SAVE_KEY = "guerra-minima-save-v1";
 const W = 40;
 const H = 28;
@@ -11,6 +11,8 @@ const START_MONEY = 12;
 const CAPITAL_TROOPS = 6;
 const FORT_COST = 4;
 const EXTRA_ORDER_COST = 5;
+const MARCH_RANGE = 3;
+const POST_INCOME = 2;
 const POSTS = [idx(12,14), idx(20,14), idx(27,14)];
 const POST_NAMES = ["Paso Oeste", "Valle Central", "Paso Este"];
 function postCount(owner) { return POSTS.filter(i => state.cells[i].owner === owner).length; }
@@ -67,6 +69,77 @@ let cameraStart = null;
 let moveSource = null;
 let pendingMove = null;
 let pendingAttack = null;
+let movePaths = new Map();
+let effects = [];
+let combatCardOpen = false;
+let soundEnabled = localStorage.getItem("guerra-minima-sound") === "1";
+let audioContext = null;
+const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+
+function playCue(kind) {
+  if (!soundEnabled) return;
+  try {
+    const Audio = window.AudioContext || window.webkitAudioContext;
+    if (!Audio) return;
+    audioContext ||= new Audio();
+    if (audioContext.state === "suspended") audioContext.resume().catch(() => {});
+    const tones = kind === "loss" ? [180,120] : kind === "capture" ? [330,440,660] : kind === "attack" ? [220,280] : [440,550];
+    tones.forEach((frequency,i) => {
+      const at = audioContext.currentTime + i*.065;
+      const osc = audioContext.createOscillator(), gain = audioContext.createGain();
+      osc.type = "sine"; osc.frequency.value = frequency;
+      gain.gain.setValueAtTime(0,at); gain.gain.linearRampToValueAtTime(.045,at+.01);
+      gain.gain.exponentialRampToValueAtTime(.001,at+.13);
+      osc.connect(gain); gain.connect(audioContext.destination); osc.start(at); osc.stop(at+.14);
+    });
+  } catch { /* Sound is optional; gameplay never depends on audio. */ }
+}
+
+function feedback(tile, label, kind="move", path=null) {
+  effects.push({tile,label,kind,path,start:null});
+  effects = effects.slice(-8);
+  playCue(kind);
+}
+
+// Breadth-first traversal: only owned land, never across water or enemy territory.
+function marchPaths(source, owner) {
+  const paths = new Map();
+  if (!Number.isInteger(source) || !isLand(source) || state.cells[source]?.owner !== owner) return paths;
+  paths.set(source,[source]);
+  const queue = [source];
+  for (let head=0; head<queue.length; head++) {
+    const at = queue[head], path = paths.get(at);
+    if (path.length > MARCH_RANGE) continue;
+    for (const next of neighbors(at)) {
+      if (paths.has(next) || !isLand(next) || state.cells[next].owner !== owner) continue;
+      paths.set(next,[...path,next]); queue.push(next);
+    }
+  }
+  paths.delete(source);
+  return paths;
+}
+
+function combatForecast(attacker, target, source=strongestAdjacent(target,attacker)) {
+  const defender = attacker === "p" ? "ai" : "p";
+  const origins = neighbors(target).filter(i => state.cells[i].owner === attacker && state.cells[i].troops > 1);
+  if (!origins.includes(source) || state.cells[target].owner !== defender) return null;
+  const attackBonus = origins.length >= 2 ? 1 : 0;
+  const defenseBonus = ["forest","hills"].includes(terrain[target]) ? 1 : 0;
+  let wins = 0;
+  for (let a=1;a<=6;a++) for (let d=1;d<=6;d++) if(a+attackBonus>d+defenseBonus) wins++;
+  return {source,target,attackBonus,defenseBonus,wins,percent:Math.round(wins/36*100)};
+}
+
+function refreshCombatCard() {
+  const card = el("combatResult");
+  card.hidden = !combatCardOpen || !state.lastCombat || rivalBriefingVisible();
+  if (card.hidden) return;
+  const result = state.lastCombat;
+  el("combatDice").textContent = "VOS " + result.attackRoll + (result.attackBonus ? "+1" : "") + "  :  " + result.defendRoll + (result.defenseBonus ? "+1" : "") + " RIVAL";
+  el("combatOutcome").textContent = result.message + ".";
+  card.dataset.outcome = result.outcome;
+}
+
 
 let toastTimer = null;
 
@@ -223,6 +296,7 @@ function load() {
     state = parsed;
     terrain = generateTerrain(state.seed);
     state.version = VERSION;
+    state.lastCombat ||= null;
     const oldPlayerMoney = Number(state.resources?.money);
     const oldAiMoney = Number(state.aiResources?.money);
     state.resources = { money:Number.isFinite(oldPlayerMoney) ? oldPlayerMoney : START_MONEY };
@@ -256,6 +330,7 @@ function load() {
 }
 
 function resetGame() {
+  effects = []; combatCardOpen = false; movePaths.clear();
   state = newState();
   selected = null;
   moveSource = null;
@@ -291,7 +366,7 @@ function troopTotal(owner) {
 }
 
 function incomeFor(owner) {
-  return Math.max(2, Math.floor(territoryCount(owner) / 5));
+  return Math.max(2, Math.floor(territoryCount(owner) / 5)) + postCount(owner) * POST_INCOME;
 }
 
 function strongestAdjacent(i, owner) {
@@ -334,6 +409,7 @@ function replanTurn() {
       : "Todavía no hay cambios para replantear.");
     return false;
   }
+  effects = []; combatCardOpen = false; movePaths.clear();
   const baseline = state.turnBaseline;
   state.cells = baseline.cells.map((c) => ({...c}));
   state.resources = {...baseline.resources};
@@ -367,7 +443,7 @@ function syncUI() {
 
   const pct = Math.round(territoryShare("p") * 100);
   el("resources").innerHTML =
-    '<div class="resource"><span>¤</span><b>' + state.resources.money + '</b><small>monedas</small></div>' +
+    '<div class="resource"><span>¤</span><b>' + state.resources.money + '</b><small>+¤' + incomeFor("p") + '/turno</small></div>' +
     '<div class="resource"><span>♟</span><b>' + troopTotal("p") + '</b><small>tropas</small></div>' +
     '<div class="resource"><span>⚑</span><b>' + pct + '%</b><small>territorio · meta 60%</small></div>';
 
@@ -404,6 +480,7 @@ function syncUI() {
   refreshReportUI();
   updateSelectionUI();
   refreshRivalBriefing();
+  refreshCombatCard();
 }
 
 function sectorLabel(i) {
@@ -419,7 +496,7 @@ function ownerLabel(owner) {
 
 function updateSelectionUI() {
   if (selected == null) {
-    el("selectionTitle").textContent = moveSource == null ? "Tocá una zona del mapa" : "Elegí un territorio propio vecino";
+    el("selectionTitle").textContent = moveSource == null ? "Tocá una zona del mapa" : "Elegí un destino marcado en celeste";
     el("selectionMeta").textContent = moveSource == null
       ? "Los números son tropas. Inspeccionar, hacer zoom y pensar no gasta acciones."
       : "Después elegís cuántas tropas trasladar. El origen siempre conserva al menos 1.";
@@ -432,19 +509,23 @@ function updateSelectionUI() {
 
     const bits = [ownerLabel(c.owner), "sector " + (pos.x+1) + "." + (pos.y+1)];
     if (c.owner) bits.push((c.troops || 0) + ((c.troops || 0) === 1 ? " tropa" : " tropas"));
-    if (c.building === "outpost") bits.push("objetivo estratégico");
+    if (c.building === "outpost") bits.push("+¤2 por turno al controlarlo");
     if (c.fort) bits.push("escudo: absorbe 1 derrota defensiva");
     if (c.owner === null && isLand(selected)) bits.push(strongestAdjacent(selected,"p") != null ? "PODÉS EXPANDIR" : "necesitás 2 tropas en un vecino");
     if (c.owner === "ai" && adjacentOwner(selected,"p")) bits.push(strongestAdjacent(selected,"p") != null ? "PODÉS ATACAR" : "frontera rival · necesitás 2 tropas");
     if (c.owner === "ai" && c.building === "capital") bits.push("tomarlo gana la partida");
     if (c.owner === "p" && selected === state.playerCapital) bits.push("protegé este cuartel");
     if (c.owner === "p" && strongestAdjacent(selected,"ai") != null) bits.push("AMENAZADO desde " + sectorLabel(strongestAdjacent(selected,"ai")));
-    if (c.owner === "ai" && strongestAdjacent(selected,"p") != null) bits.push("atacarías desde " + sectorLabel(strongestAdjacent(selected,"p")) + " · ganar tirada: 42%");
+    if (["forest","hills"].includes(terrain[selected])) bits.push("cobertura: +1 al dado defensor");
+    const forecast = c.owner === "ai" ? combatForecast("p",selected) : null;
+    if (forecast) bits.push("ganar tirada: " + forecast.percent + "%" + (forecast.attackBonus ? " · flanqueo +1" : ""));
 
     el("selectionTitle").textContent = title;
     el("selectionMeta").textContent = bits.join(" · ");
   }
 
+  el("cancelMoveBtn").hidden = moveSource == null;
+  mapShell.classList[moveSource != null ? "add" : "remove"]("moving-troops");
   document.querySelectorAll(".actions button").forEach((button) => {
     button.disabled = !canAction(button.dataset.action);
   });
@@ -482,7 +563,7 @@ function canAction(action) {
   if (action === "expand") return isLand(selected) && c.owner === null && strongestAdjacent(selected,"p") != null;
   if (action === "fortify") return c.owner === "p" && !c.fort && state.resources.money >= FORT_COST;
   if (action === "reinforce") return c.owner === "p";
-  if (action === "move") return c.owner === "p" && c.troops > 1;
+  if (action === "move") return c.owner === "p" && c.troops > 1 && marchPaths(selected,"p").size > 0;
   if (action === "attack") return c.owner === "ai" && strongestAdjacent(selected,"p") != null;
   return false;
 }
@@ -561,6 +642,7 @@ function acknowledgeRivalBriefing() {
   state.rivalBriefingSeen = true;
   save();
   refreshRivalBriefing();
+  refreshCombatCard();
 }
 
 function focusRivalBriefingEvent(index) {
@@ -650,60 +732,63 @@ function showVictory() {
   if (!el("victoryDialog").open) el("victoryDialog").showModal();
 }
 
-function resolveCombat(attacker, target) {
-  const defender = attacker === "p" ? "ai" : "p";
-  const source = strongestAdjacent(target, attacker);
-  if (source == null || state.cells[target].owner !== defender) return null;
-
+function resolveCombat(attacker, target, chosenSource=strongestAdjacent(target,attacker)) {
+  const forecast = combatForecast(attacker,target,chosenSource);
+  if (!forecast) return null;
+  const {source,attackBonus,defenseBonus} = forecast;
   const attackRoll = 1 + Math.floor(Math.random()*6);
   const defendRoll = 1 + Math.floor(Math.random()*6);
-  const sourceCell = state.cells[source];
-  const targetCell = state.cells[target];
-  const targetWasCapital = targetCell.building === "capital";
-  let message = "";
-
-  if (attackRoll > defendRoll && targetCell.fort) {
-    targetCell.fort = false;
-    message = "rompió la fortificación (" + attackRoll + "-" + defendRoll + "); no hubo bajas";
-  } else if (attackRoll > defendRoll) {
-    targetCell.troops = Math.max(0, targetCell.troops - 1);
+  const sourceCell = state.cells[source], targetCell = state.cells[target];
+  const attackWon = attackRoll + attackBonus > defendRoll + defenseBonus;
+  const dice = " (" + attackRoll + (attackBonus ? "+1" : "") + " contra " + defendRoll + (defenseBonus ? "+1" : "") + ")";
+  let message, outcome;
+  if (attackWon && targetCell.fort) {
+    targetCell.fort = false; outcome = "shield";
+    message = "rompió el escudo; no hubo bajas";
+  } else if (attackWon) {
+    targetCell.troops -= 1;
     if (targetCell.troops === 0) {
-      sourceCell.troops -= 1;
-      targetCell.owner = attacker;
-      targetCell.troops = 1;
-      message = "conquistó " + (targetWasCapital ? "el cuartel" : "un sector") + " (" + attackRoll + "-" + defendRoll + ")";
-    } else {
-      message = "hizo perder 1 tropa al defensor (" + attackRoll + "-" + defendRoll + ")";
-    }
+      sourceCell.troops -= 1; targetCell.owner = attacker; targetCell.troops = 1;
+      outcome = "capture";
+      message = "conquistó " + (targetCell.building === "capital" ? "el cuartel" : sectorLabel(target));
+    } else { outcome = "hit"; message = "hizo perder 1 tropa al defensor"; }
   } else {
-    sourceCell.troops -= 1;
-    message = "perdió 1 tropa atacando (" + attackRoll + "-" + defendRoll + ")";
+    sourceCell.troops -= 1; outcome = "loss";
+    message = "perdió 1 tropa atacando";
   }
-  return {source,target,message,attackRoll,defendRoll};
+  return {source,target,message:message+dice,attackRoll,defendRoll,attackBonus,defenseBonus,outcome};
 }
 
 function beginMove() {
   if (!canAction("move")) return;
   moveSource = selected;
+  movePaths = marchPaths(moveSource,"p");
+  combatCardOpen = false; refreshCombatCard();
   updateSelectionUI();
-  toast("Elegí un territorio propio vecino para mover 1 tropa.");
+  toast("Marcha: elegí un destino celeste hasta 3 casillas. Después elegís la cantidad.");
+}
+
+function cancelMove() {
+  moveSource = null; movePaths.clear(); pendingMove = null;
+  updateSelectionUI();
 }
 
 function finishMove(target) {
   if (moveSource == null) return false;
   const source = moveSource;
-  moveSource = null;
-  if (state.winner || state.ap <= 0) return false;
-  if (target == null || target === source || !neighbors(source).includes(target) || state.cells[target].owner !== "p" || state.cells[source].troops <= 1) {
-    toast("Movimiento cancelado: elegí un territorio propio vecino.");
+  if (state.winner || state.ap <= 0) { cancelMove(); return false; }
+  const path = marchPaths(source,"p").get(target);
+  if (!path || state.cells[source].troops <= 1) {
+    toast("Elegí un destino celeste conectado por hasta 3 casillas propias, o Cancelar.");
     return false;
   }
-  pendingMove = {source,target};
+  pendingMove = {source,target,path};
+  moveSource = null; movePaths.clear();
   const max = state.cells[source].troops - 1;
   const input = el("moveAmount");
   input.max = String(max);
   input.value = String(Math.min(max, Math.max(1, Math.ceil(max/2))));
-  refreshMovePreview();
+  updateSelectionUI(); refreshMovePreview();
   el("moveDialog").showModal();
   return true;
 }
@@ -713,11 +798,11 @@ function refreshMovePreview() {
   const {source,target} = pendingMove;
   const input = el("moveAmount");
   const max = state.cells[source].troops - 1;
-  let amount = Math.max(1, Math.min(max, Number(input.value) || 1));
+  let amount = Math.max(1, Math.min(max, Math.floor(Number(input.value) || 1)));
   input.value = String(amount);
   el("moveAmountLabel").textContent = amount + (amount === 1 ? " tropa" : " tropas");
   el("movePreview").textContent = sectorLabel(source) + " → " + sectorLabel(target) +
-    " · quedan " + (state.cells[source].troops - amount) +
+    " · " + (pendingMove.path.length-1) + " casillas · 1 acción · quedan " + (state.cells[source].troops - amount) +
     " · llegan " + (state.cells[target].troops + amount);
 }
 
@@ -725,9 +810,12 @@ function confirmMove() {
   if (!pendingMove || state.winner || state.ap <= 0) return;
   const {source,target} = pendingMove;
   const max = state.cells[source].troops - 1;
-  const amount = Math.max(1, Math.min(max, Number(el("moveAmount").value) || 1));
+  const path = marchPaths(source,"p").get(target);
+  if (!path || max < 1) { closeDialog("move"); toast("La ruta ya no está disponible."); return; }
+  const amount = Math.max(1, Math.min(max, Math.floor(Number(el("moveAmount").value) || 1)));
   state.cells[source].troops -= amount;
   state.cells[target].troops += amount;
+  feedback(target,"+" + amount + " tropas","move",path);
   pendingMove = null;
   selected = target;
   useAction();
@@ -745,28 +833,41 @@ function requestAttack() {
   const target = selected;
   const source = strongestAdjacent(target,"p");
   pendingAttack = {source,target};
-  const a = state.cells[source];
-  const d = state.cells[target];
-  el("attackPreview").textContent =
-    sectorLabel(source) + " (" + a.troops + " tropas) → " + sectorLabel(target) + " (" + d.troops + " tropas)" +
-    (d.fort ? " · defensor fortificado" : "") +
-    " · cada lado tira 1d6 · ganás esta tirada con 15/36 (42%).";
+  const origins = neighbors(target).filter(i => state.cells[i].owner === "p" && state.cells[i].troops > 1);
+  el("attackSource").innerHTML = origins.map(i => '<option value="'+i+'">'+sectorLabel(i)+' · '+state.cells[i].troops+' tropas</option>').join("");
+  el("attackSource").value = String(source);
+  refreshAttackPreview();
   el("attackDialog").showModal();
+}
+
+function refreshAttackPreview() {
+  if (!pendingAttack) return;
+  const source = Number(el("attackSource").value), target = pendingAttack.target;
+  const forecast = combatForecast("p",target,source);
+  if (!forecast) return;
+  pendingAttack.source = source;
+  const a = state.cells[source], d = state.cells[target];
+  el("attackOdds").textContent = forecast.percent + "%";
+  el("attackModifiers").textContent = (forecast.attackBonus ? "Flanqueo +1" : "Sin flanqueo") + " · " + (forecast.defenseBonus ? "Cobertura rival +1" : "Rival sin cobertura");
+  el("attackPreview").textContent = sectorLabel(source) + " (" + a.troops + " tropas) → " + sectorLabel(target) + " (" + d.troops + " tropas).\n" +
+    "Si ganás: " + (d.fort ? "rompés el escudo, sin bajas." : d.troops === 1 ? "conquistás y trasladás 1 tropa." : "el rival pierde 1 tropa; no conquistás todavía.") +
+    "\nSi perdés o empatás: perdés 1 tropa en origen.\n" +
+    "Ganar la tirada: " + forecast.wins + "/36. Más tropas permiten resistir; no suman al dado.";
 }
 
 function confirmAttack() {
   if (!pendingAttack || state.winner || state.ap <= 0) return;
-  const target = pendingAttack.target;
-  selected = target;
-  pendingAttack = null;
+  const {target,source} = pendingAttack;
   closeDialog("attack");
+  const result = resolveCombat("p",target,source);
+  if (!result) { toast("El ataque dejó de estar disponible. No gastaste acciones."); return; }
+  selected = target;
   state.turnCombatLocked = true;
-  const result = resolveCombat("p",target);
-  addLog(result ? "Ataque: " + result.message + "." : "El ataque dejó de estar disponible.");
-  useAction();
-  checkVictory();
-  save();
-  syncUI();
+  state.lastCombat = result; combatCardOpen = true;
+  const labels = {capture:"CONQUISTA",hit:"−1 rival",loss:"−1 tropa",shield:"ESCUDO ROTO"};
+  feedback(result.outcome === "loss" ? source : target,labels[result.outcome],result.outcome === "loss" ? "loss" : result.outcome === "capture" ? "capture" : "attack",[source,target]);
+  addLog("Ataque: " + result.message + ".");
+  useAction(); checkVictory(); save(); syncUI();
 }
 
 function act(action) {
@@ -783,7 +884,7 @@ function act(action) {
     return;
   }
 
-  moveSource = null;
+  moveSource = null; movePaths.clear(); combatCardOpen = false;
   const c = state.cells[selected];
   const t = terrain[selected];
 
@@ -792,16 +893,19 @@ function act(action) {
     state.cells[source].troops -= 1;
     c.owner = "p";
     c.troops = 1;
+    feedback(selected,"+1 territorio","capture",[source,selected]);
     addLog("Expandiste la frontera hacia " + TERRAIN_LABELS[t].toLowerCase() + ".");
   }
 
   if (action === "reinforce") {
     c.troops += 2;
+    feedback(selected,"+2 tropas","reinforce");
     addLog("Reforzaste " + sectorLabel(selected) + ": +2 tropas gratis.");
   }
 
   if (action === "fortify") {
     state.resources.money -= FORT_COST; c.fort = true;
+    feedback(selected,"ESCUDO +1","fortify");
     addLog("Fortificación lista: absorbe una derrota al defender. Costó ¤4.");
   }
 
@@ -841,24 +945,23 @@ function buyExtraOrder() {
 
 function aiMoveTowardPlayer() {
   const options = [];
-  for (let i=0; i<state.cells.length; i++) {
+  const goalDistance = i => Math.min(...[state.playerCapital,...POSTS.filter(t => state.cells[t].owner !== "ai")].map(t => Math.abs(xy(i).x-xy(t).x)+Math.abs(xy(i).y-xy(t).y)));
+  for (let i=0;i<state.cells.length;i++) {
     const c = state.cells[i];
-    if (c.owner !== "ai" || c.troops <= 1) continue;
-    const from = xy(i);
-    const fromDist = Math.abs(from.x-xy(state.playerCapital).x) + Math.abs(from.y-xy(state.playerCapital).y);
-    for (const n of neighbors(i)) {
-      if (state.cells[n].owner !== "ai") continue;
-      const to = xy(n);
-      const toDist = Math.abs(to.x-xy(state.playerCapital).x) + Math.abs(to.y-xy(state.playerCapital).y);
-      if (toDist < fromDist) options.push([i,n,toDist]);
+    if (c.owner !== "ai" || c.troops <= 1 || neighbors(i).some(n => state.cells[n].owner === "p")) continue;
+    for (const [to,path] of marchPaths(i,"ai")) {
+      if (goalDistance(to) >= goalDistance(i) || !neighbors(to).some(n => isLand(n) && state.cells[n].owner !== "ai")) continue;
+      if (state.cells[to].troops >= 5) continue;
+      options.push({from:i,to,path,score:goalDistance(to)+state.cells[to].troops});
     }
   }
+  options.sort((a,b) => a.score-b.score);
   if (!options.length) return null;
-  options.sort((a,b) => a[2]-b[2]);
-  const [from,to] = options[Math.floor(Math.random()*Math.min(5,options.length))];
-  state.cells[from].troops -= 1;
-  state.cells[to].troops += 1;
-  return {from,to};
+  const best = options[0];
+  best.amount = state.cells[best.from].troops-1;
+  state.cells[best.from].troops -= best.amount;
+  state.cells[best.to].troops += best.amount;
+  return best;
 }
 
 function aiTurn() {
@@ -904,6 +1007,11 @@ function aiTurn() {
       state.cells[exposedPost].fort = true; state.aiResources.money -= FORT_COST;
       record("Fortificó " + sectorLabel(exposedPost) + ".", exposedPost); continue;
     }
+    const marched = aiMoveTowardPlayer();
+    if (marched) {
+      record("Trasladó " + marched.amount + " tropas de " + sectorLabel(marched.from) + " a " + sectorLabel(marched.to) + " por territorio propio.",marched.to);
+      continue;
+    }
     if (reinforceables.length) {
       const frontier = reinforceables.filter((i) => neighbors(i).some((n) => state.cells[n].owner !== "ai" && isLand(n)));
       const pool = frontier.length ? frontier : reinforceables;
@@ -940,6 +1048,7 @@ function requestEndTurn() {
 
 function endTurn() {
   if (state.winner) return showVictory();
+  effects = []; combatCardOpen = false; movePaths.clear();
   moveSource = null;
   pendingMove = null;
   pendingAttack = null;
@@ -1133,6 +1242,7 @@ function drawHills(p) {
 }
 
 function render(time=0) {
+  if (motionQuery?.matches) time = 0;
   ctx.clearRect(0,0,viewW,viewH);
   ctx.fillStyle = "#168eea";
   ctx.fillRect(0,0,viewW,viewH);
@@ -1209,7 +1319,7 @@ function render(time=0) {
           ctx.strokeText("★",p.x,p.y-20*zoom); ctx.fillText("★",p.x,p.y-20*zoom); ctx.restore();
         }
         if (c.fort) outlineDiamond(p,"#62e8ff",Math.max(2,3*zoom));
-        if (moveSource != null && c.owner === "p" && neighbors(moveSource).includes(i)) outlineDiamond(p,"#62e8ff",3,true);
+        if (moveSource != null && c.owner === "p" && movePaths.has(i)) outlineDiamond(p,"#62e8ff",3,true);
         drawTroops(p,c);
 
 
@@ -1218,7 +1328,34 @@ function render(time=0) {
 
   }
   if(selected !== null) { const q=xy(selected);outlineDiamond(iso(q.x,q.y),"#111",5);outlineDiamond(iso(q.x,q.y),"#fffef2",2.5); }
+  drawFeedback();
   requestAnimationFrame(render);
+}
+
+function drawFeedback() {
+  const now = Date.now(), reduced = !!motionQuery?.matches;
+  effects = effects.filter(fx => { fx.start ??= now; return now-fx.start < (reduced ? 1200 : 950); });
+  for (const fx of effects) {
+    const progress = reduced ? 0 : Math.min(1,(now-fx.start)/950);
+    const q = xy(fx.tile), p = iso(q.x,q.y);
+    const color = fx.kind === "loss" ? "#ff7965" : fx.kind === "capture" ? "#fff36b" : "#62e8ff";
+    ctx.save(); ctx.globalAlpha = reduced ? 1 : Math.min(1,(1-progress)*3);
+    if (fx.path?.length > 1) {
+      ctx.strokeStyle=color; ctx.lineWidth=3; ctx.setLineDash([5,4]); ctx.beginPath();
+      fx.path.forEach((i,n) => { const at=xy(i),pt=iso(at.x,at.y); if(n)ctx.lineTo(pt.x,pt.y+TH/2*zoom);else ctx.moveTo(pt.x,pt.y+TH/2*zoom); });
+      ctx.stroke(); ctx.setLineDash([]);
+      if (!reduced) {
+        const position = Math.min(.999,progress*2)*(fx.path.length-1), segment = Math.floor(position), t=position-segment;
+        const a=xy(fx.path[segment]),b=xy(fx.path[segment+1]),pa=iso(a.x,a.y),pb=iso(b.x,b.y);
+        ctx.fillStyle=color;ctx.beginPath();ctx.arc(pa.x+(pb.x-pa.x)*t,pa.y+(pb.y-pa.y)*t+TH/2*zoom,5,0,Math.PI*2);ctx.fill();
+      }
+    }
+    outlineDiamond(p,color,3);
+    const y=p.y-24*zoom-progress*25;
+    ctx.font="900 12px system-ui,sans-serif";ctx.textAlign="center";
+    ctx.strokeStyle="#0b0c09";ctx.lineWidth=5;ctx.strokeText(fx.label,p.x,y);
+    ctx.fillStyle=color;ctx.fillText(fx.label,p.x,y);ctx.restore();
+  }
 }
 
 function resize() {
@@ -1274,10 +1411,9 @@ function selectAt(clientX,clientY) {
   const p = canvasPoint(clientX,clientY);
   const picked = pickTile(p.x,p.y);
   if (moveSource != null) {
-    if (finishMove(picked)) {
-      el("mapHint").style.opacity = "0";
-      return;
-    }
+    finishMove(picked);
+    el("mapHint").style.opacity = "0";
+    return;
   }
   selected = picked;
   updateSelectionUI();
@@ -1343,9 +1479,9 @@ const TUTORIAL_STEPS = [
   {title:"5 · Tus 6 acciones", target:".actions", text:"Expandir, reforzar, mover, atacar y fortificar consumen acciones. Tener 6 no significa jugar rápido: son margen para desarrollar una ronda con más decisiones."},
   {title:"6 · Expandir", target:'[data-action="expand"]', text:"Seleccioná un neutral junto a tus tierras. Un vecino propio necesita al menos 2 tropas: una pasa al territorio nuevo. Expandir gasta 1 acción."},
   {title:"7 · Reforzar", target:'[data-action="reinforce"]', text:"En cualquier territorio propio, Reforzar suma +2 tropas gratis. Cuesta 1 acción y no usa monedas."},
-  {title:"8 · Mover varias tropas", target:'[data-action="move"]', text:"Elegí un territorio propio con 2+ tropas, tocá Mover y después un vecino propio. Antes de confirmar elegís cuántas trasladar, cuánto queda atrás y cuánto llega. Todo el traslado cuesta 1 acción."},
-  {title:"9 · Atacar con información", target:'[data-action="attack"]', text:"Seleccioná un rival adyacente. Antes de tirar, ves origen, fuerzas, fortificación y probabilidad. Al confirmar el primer ataque, REPLANTEAR se bloquea para impedir repetir tiradas."},
-  {title:"10 · Economía y Tienda", target:"#storeBtn", text:"La Tienda está siempre al lado de la selección. Las monedas no compran tropas normales: sirven para fortificar un sector propio o comprar una Orden extra."},
+  {title:"8 · Mover varias tropas", target:'[data-action="move"]', text:"Elegí un territorio propio con 2+ tropas, tocá Mover y después un destino celeste a hasta 3 casillas por tierras propias. Antes de confirmar elegís cuántas trasladar, cuánto queda atrás y cuánto llega. Siempre queda 1 tropa en origen. Todo el traslado cuesta 1 acción."},
+  {title:"9 · Atacar con información", target:'[data-action="attack"]', text:"Seleccioná un rival adyacente. Elegí el origen. Dos vecinos tuyos con 2+ tropas dan flanqueo +1; bosque o colinas dan cobertura +1 al defensor. La vista previa muestra la probabilidad exacta y qué pasa si ganás o perdés. Al confirmar el primer ataque, REPLANTEAR se bloquea para impedir repetir tiradas."},
+  {title:"10 · Economía y Tienda", target:"#storeBtn", text:"La Tienda está siempre al lado de la selección. Las monedas no compran tropas normales: sirven para fortificar un sector propio o comprar una Orden extra. Cada puesto ★ controlado suma +¤2 al ingreso por turno; tomalo y defendelo."},
   {title:"11 · PLAN", target:"#planBtn", text:"PLAN es una libreta táctica gratis. Marcá hasta 5 sectores numerados para recordar un orden, una amenaza o un objetivo. No modifica el tablero."},
   {title:"12 · REPLANTEAR", target:"#replanBtn", text:"Antes de atacar, REPLANTEAR restaura tropas, acciones, dinero, hitos y fortificaciones al estado del inicio de la ronda. Tus marcas PLAN quedan para que pruebes otra idea."},
   {title:"13 · Revisá al rival", target:"#reportBtn", text:"Al volver a tu turno aparece un resumen rival sobre el mapa. RIVAL conserva además el historial de las últimas rondas: tocá un evento y el mapa te lleva al sector."},
@@ -1458,6 +1594,24 @@ function bindEvents() {
   el("moveAmount").addEventListener("input",refreshMovePreview);
   el("confirmMoveBtn").addEventListener("click",confirmMove);
   el("confirmAttackBtn").addEventListener("click",confirmAttack);
+  el("attackSource").addEventListener("change",refreshAttackPreview);
+  el("cancelMoveBtn").addEventListener("click",cancelMove);
+  el("moveAllBtn").addEventListener("click",() => { el("moveAmount").value=el("moveAmount").max; refreshMovePreview(); });
+  el("moveHalfBtn").addEventListener("click",() => { el("moveAmount").value=String(Math.ceil(Number(el("moveAmount").max)/2)); refreshMovePreview(); });
+  el("combatDismissBtn").addEventListener("click",() => { combatCardOpen=false; refreshCombatCard(); });
+  el("lastCombatBtn").addEventListener("click",() => {
+    closeDialog("menu");
+    if (!state.lastCombat) return toast("Todavía no atacaste en esta partida.");
+    acknowledgeRivalBriefing(); combatCardOpen=true; centerOnTile(state.lastCombat.target); refreshCombatCard();
+  });
+  const soundBtn=el("soundBtn");
+  soundBtn.textContent="SONIDO · " + (soundEnabled ? "ACTIVADO" : "APAGADO");
+  soundBtn.setAttribute?.("aria-pressed",String(soundEnabled));
+  soundBtn.addEventListener("click",() => {
+    soundEnabled=!soundEnabled; localStorage.setItem("guerra-minima-sound",soundEnabled ? "1" : "0");
+    soundBtn.textContent="SONIDO · " + (soundEnabled ? "ACTIVADO" : "APAGADO");
+    soundBtn.setAttribute?.("aria-pressed",String(soundEnabled)); playCue("move");
+  });
   el("menuBtn").addEventListener("click",() => el("menuDialog").showModal());
   el("helpBtn").addEventListener("click",() => { closeDialog("menu"); el("helpDialog").showModal(); });
   el("tutorialBtn").addEventListener("click",startTutorial);

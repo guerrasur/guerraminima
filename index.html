@@ -7,7 +7,7 @@
   <meta name="description" content="Guerra Mínima — prototipo de estrategia asíncrona." />
   <title>Guerra Mínima</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./style.css?v=0.8.0" />
+  <link rel="stylesheet" href="./style.css?v=0.9.0" />
 </head>
 <body>
   <main id="app">
@@ -43,6 +43,11 @@
         <button id="zoomOutBtn" aria-label="Alejar">−</button>
       </div>
       <div class="map-tools"><button id="objectiveBtn">★ PUESTOS</button><button id="planBtn">＋ PLAN</button><button id="clearPlanBtn">LIMPIAR</button><button id="reportBtn">☷ RIVAL</button></div>
+      <button id="cancelMoveBtn" class="cancel-move" hidden>CANCELAR MARCHA · hasta 3 casillas</button>
+      <aside id="combatResult" class="combat-result" hidden aria-live="polite">
+        <div class="combat-result-head"><small>RESULTADO DEL ATAQUE</small><button id="combatDismissBtn" aria-label="Cerrar resultado">×</button></div>
+        <strong id="combatDice"></strong><p id="combatOutcome"></p>
+      </aside>
       <div id="threatLabel" class="threat-label"></div>
       <button id="centerBtn" class="center-btn">⌖</button>
       <div id="toast" class="toast" aria-live="polite"></div>
@@ -91,23 +96,27 @@
     </div>
     <button id="tutorialBtn" class="secondary-btn">Tutorial completo · aprender de pe a pa</button>
     <button id="helpBtn" class="secondary-btn">Reglas y referencia rápida</button>
+    <button id="soundBtn" class="secondary-btn" aria-pressed="false">SONIDO · APAGADO</button>
+    <button id="lastCombatBtn" class="secondary-btn">Revisar último combate</button>
     <button id="newGameBtn" class="danger-btn">Generar un continente nuevo</button>
     <p class="dialog-copy">La partida se guarda automáticamente en este dispositivo. El rival juega después de que cerrás tu turno. No existe temporizador: una ronda puede durar varios minutos o quedar esperando hasta que vuelvas.</p>
-    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.8.0</b></div>
+    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.9.0</b></div>
   </dialog>
 
   <dialog id="helpDialog">
     <div class="dialog-head">
-      <div><small>REGLAS · v0.8.0</small><h2>Cómo se juega</h2></div>
+      <div><small>REGLAS · v0.9.0</small><h2>Cómo se juega</h2></div>
       <button data-close="help">×</button>
     </div>
-    <div class="changelog"><small>NUEVO EN v0.8.0 · ENTRAR AL TURNO INFORMADO</small>
+    <div class="changelog"><small>NUEVO EN v0.9.0 · CADA POSICIÓN CUENTA</small>
       <ol>
-        <li><b>Tienda a mano.</b> Sale del menú y queda junto a la selección, con el saldo siempre visible.</li>
-        <li><b>Resumen rival automático.</b> Al volver a tu turno aparece sobre el mapa y se mantiene hasta que lo leas o descartes.</li>
-        <li><b>Resumen navegable.</b> Tocá un movimiento enemigo para centrar el sector; RIVAL conserva el historial completo.</li>
-        <li><b>Tienda contextual.</b> Indica si el sector elegido se puede fortificar y cuánto cuesta.</li>
-        <li><b>Correcciones.</b> Refuerzo muestra +2 desde el primer render y la Orden extra pasa a mostrar 7/7 acciones.</li>
+        <li><b>Marcha.</b> Trasladá la cantidad que quieras hasta 3 casillas conectadas por tierra propia por 1 acción. Siempre queda 1 tropa atrás.</li>
+        <li><b>Flanqueo.</b> Dos o más vecinos atacantes con 2+ tropas dan +1 al dado de ataque. No se acumula.</li>
+        <li><b>Cobertura.</b> Bosques y colinas dan +1 al dado defensor. Se combina con el escudo. El empate sigue favoreciendo al defensor.</li>
+        <li><b>Combates legibles.</b> Elegí el origen, mirá la probabilidad exacta y las consecuencias. Después ves los dados y las bajas sobre el mapa.</li>
+        <li><b>Puestos que importan.</b> Cada ★ propio suma +¤2 por turno. Capturarlo no da victoria automática.</li>
+        <li><b>Acciones que se sienten.</b> Rutas animadas, tropas que llegan, conquistas y escudos con feedback; sonido opcional desde el menú.</li>
+        <li><b>Rival más capaz.</b> Ahora traslada tropas de retaguardia al frente usando las mismas reglas.</li>
       </ol>
     </div>
     <button id="tutorialFromHelpBtn" class="secondary-btn">ABRIR TUTORIAL COMPLETO</button>
@@ -117,10 +126,12 @@
       <p><b>6 acciones.</b> Expandir, reforzar, mover, atacar y fortificar consumen acciones. Inspeccionar, zoom, cámara, PLAN, RIVAL y reglas son gratis.</p>
       <p><b>Expandir.</b> Neutral adyacente; un vecino propio necesita 2+ tropas y transfiere 1 al nuevo sector.</p>
       <p><b>Reforzar.</b> +2 tropas sobre cualquier territorio propio, ¤0, 1 acción.</p>
-      <p><b>Mover.</b> Entre vecinos propios. Elegís la cantidad y siempre queda al menos 1 tropa en origen. Todo el traslado cuesta 1 acción.</p>
-      <p><b>Atacar.</b> Previsualización antes de tirar. 1d6 contra 1d6; empate favorece al defensor. El primer ataque bloquea REPLANTEAR para que no haya rerolls.</p>
+      <p><b>Mover.</b> Hasta 3 pasos ortogonales por casillas propias conectadas; nunca cruza agua ni rivales. Elegís la cantidad y siempre queda al menos 1 tropa en origen. Todo el traslado cuesta 1 acción.</p>
+      <p><b>Atacar.</b> Previsualización antes de tirar. 1d6 por lado; empate favorece al defensor. Flanqueo: +1 atacante si al menos dos vecinos atacantes tienen 2+ tropas. Cobertura: +1 defensor en bosque o colinas. Sin bonificaciones ganás 15/36 (42%); solo flanqueo 21/36 (58%); solo cobertura 10/36 (28%); ambas 15/36. Más tropas dan resistencia, no un dado mayor. Un escudo absorbe una tirada ganada sin bajas. El primer ataque bloquea REPLANTEAR para que no haya rerolls.</p>
       <p><b>REPLANTEAR.</b> Antes de atacar restaura tablero, dinero, acciones, hitos y fortificaciones al comienzo de la ronda. PLAN se conserva como anotación.</p>
       <p><b>Tienda.</b> Está siempre junto a la selección. Fortificar cuesta ¤4 + 1 acción; Orden extra cuesta ¤5 y suma +1 acción una vez por ronda. Las tropas normales no cuestan monedas.</p>
+      <p><b>Puestos ★.</b> +¤2 por puesto controlado al empezar tu turno, además del ingreso base de max(2, territorios / 5 redondeado hacia abajo). Los hitos dan +¤6 una sola vez. Perder un puesto pierde su ingreso futuro.</p>
+      <p><b>Feedback.</b> Las rutas y etiquetas muestran cada cambio sin alterar el mapa. En Opciones podés activar sonido o revisar el último combate. Se respeta la preferencia del dispositivo de reducir movimiento.</p>
       <p><b>RIVAL.</b> Al volver a tu turno aparece un resumen automático sobre el mapa. El botón RIVAL conserva el historial reciente y cada evento puede centrar el sector afectado.</p>
       <p><b>Cerrar.</b> TERMINAR TURNO siempre pide confirmación. Si te quedan acciones, no pasa nada: podés seguir pensando sin límite.</p>
     </div>
@@ -141,11 +152,12 @@
 
   <dialog id="moveDialog">
     <div class="dialog-head"><div><small>MOVIMIENTO · 1 ACCIÓN</small><h2>Redistribuir tropas</h2></div><button data-close="move">×</button></div>
-    <p class="dialog-copy">Elegí cuántas tropas trasladar. El territorio de origen siempre conserva al menos una.</p>
+    <p class="dialog-copy">Hasta 3 casillas por tierra propia conectada. Elegí cuántas trasladar: siempre queda al menos una en origen. Cuesta 1 acción.</p>
     <div class="move-picker">
       <strong id="moveAmountLabel">1 tropa</strong>
-      <input id="moveAmount" type="range" min="1" max="1" value="1" step="1" />
+      <input id="moveAmount" aria-label="Cantidad de tropas a trasladar" type="range" min="1" max="1" value="1" step="1" />
     </div>
+    <div class="move-shortcuts"><button id="moveHalfBtn">MITAD DISPONIBLE</button><button id="moveAllBtn">TODAS MENOS UNA</button></div>
     <p id="movePreview" class="preview-copy"></p>
     <button id="confirmMoveBtn" class="primary-btn">CONFIRMAR MOVIMIENTO</button>
     <button data-close="move" class="secondary-btn">CANCELAR</button>
@@ -153,8 +165,11 @@
 
   <dialog id="attackDialog">
     <div class="dialog-head"><div><small>COMBATE · 1 ACCIÓN</small><h2>Confirmar ataque</h2></div><button data-close="attack">×</button></div>
+    <label class="attack-source-label" for="attackSource">ATACAR DESDE</label>
+    <select id="attackSource"></select>
+    <div class="combat-odds"><strong id="attackOdds">42%</strong><div><b>de ganar esta tirada</b><small id="attackModifiers"></small></div></div>
     <p id="attackPreview" class="preview-copy"></p>
-    <p class="dialog-copy">La tirada recién ocurre al confirmar. Si cancelás, no gastás la acción. Después del primer ataque REPLANTEAR queda bloqueado para impedir repetir el azar.</p>
+    <p class="dialog-copy">Flanqueo: 2+ vecinos tuyos con 2+ tropas dan +1 atacante. Cobertura: bosque o colinas dan +1 defensor. El empate favorece al defensor. La tirada recién ocurre al confirmar. Si cancelás, no gastás la acción. Después del primer ataque REPLANTEAR queda bloqueado para impedir repetir el azar.</p>
     <button id="confirmAttackBtn" class="primary-btn">TIRAR Y ATACAR</button>
     <button data-close="attack" class="secondary-btn">CANCELAR</button>
   </dialog>
@@ -193,6 +208,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=0.8.0"></script>
+  <script type="module" src="./app.js?v=0.9.0"></script>
 </body>
 </html>

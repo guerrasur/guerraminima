@@ -21,6 +21,19 @@ Guerra Mínima es un juego web mobile-first de estrategia por turnos. La demo ac
 
 Frase guía: **Guerra Mínima no intenta que juegues rápido; intenta que siempre tengas algo interesante que pensar.**
 
+## v0.9.0 — Invariantes de táctica y feedback
+
+- Marcha: hasta 3 pasos ortogonales por casillas propias de tierra, 1 acción por traslado, conserva 1 tropa en origen. Usar BFS, no distancia directa atravesando obstáculos.
+- Flanqueo: >=2 vecinos atacantes con >=2 tropas, +1 máximo al dado atacante.
+- Cobertura: bosque/colinas, +1 al dado defensor. Empates de los totales favorecen al defensor.
+- Vista previa y resolver comparten `combatForecast`; no duplicar probabilidades ni confundir ganar una tirada con conquistar.
+- El origen elegido debe respetarse. Revalidar rutas/ataques al confirmar; no gastar ni bloquear replanteo si la orden dejó de ser válida.
+- Cada puesto controlado suma +¤2 al ingreso al empezar el turno. Mantener los hitos únicos y las condiciones de victoria existentes.
+- Jugador e IA comparten bonificaciones, rutas, costes y límites.
+- Feedback solo de presentación: no altera proyección, picking, cámara, azar ni turnos. No bloquear controles esperando animaciones.
+- Respetar prefers-reduced-motion y sonido opcional apagado por defecto. El fallo de audio no puede interrumpir una acción.
+- Mantener historial del último combate al recargar. Nunca reiniciar una partida para aplicar estas reglas.
+
 ## v0.8.0
 
 - Tienda siempre visible junto a la selección; no volver a esconderla como opción secundaria.

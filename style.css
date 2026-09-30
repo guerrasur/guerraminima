@@ -316,3 +316,32 @@ h3 { font-size:12px; color:#bbed3d; margin-top:20px; }
   .market-btn { min-width:88px; padding:7px 6px; font-size:9px; }
   .rival-briefing { width:calc(100% - 68px); max-height:55%; }
 }
+
+/* v0.9: tactile feedback, readable combat, no camera displacement. */
+button { touch-action:manipulation; }
+button:not(:disabled) { transition:background-color .12s, border-color .12s, transform .1s; }
+button:not(:disabled):active { transform:translateY(1px); }
+dialog { max-height:calc(100dvh - 32px); overflow-y:auto; }
+.preview-copy { white-space:pre-line; }
+.attack-source-label { display:block; margin:14px 0 6px; color:#62e8ff; font:800 9px system-ui; letter-spacing:.08em; }
+#attackSource { width:100%; min-height:44px; padding:9px; background:#151d10; color:#fffbea; border:1px solid #62e8ff; border-radius:5px; font:700 12px system-ui; }
+.combat-odds { display:flex; gap:12px; align-items:center; padding:12px 0 0; }
+.combat-odds > strong { color:#bbed3d; font:900 36px/1 system-ui; }
+.combat-odds b { display:block; font:800 12px system-ui; }
+.combat-odds small { display:block; color:#c3c9b5; margin-top:5px; font:600 10px system-ui; }
+.move-shortcuts { display:flex; gap:8px; }
+.move-shortcuts button { flex:1; min-height:44px; background:#13252a; border:1px solid #62e8ff; border-radius:5px; font:800 9px system-ui; }
+.cancel-move { position:absolute; z-index:4; top:8px; left:8px; max-width:calc(100% - 72px); min-height:38px; background:#62e8ff; color:#0b0c09; border:2px solid #0b0c09; border-radius:5px; font:900 10px system-ui; }
+.cancel-move[hidden], .combat-result[hidden] { display:none; }
+.moving-troops .map-hint { visibility:hidden; }
+.combat-result { position:absolute; z-index:7; top:8px; left:8px; width:min(290px,calc(100% - 72px)); padding:8px 10px; border:2px solid #62e8ff; border-radius:6px; background:#0b0c09; box-shadow:0 5px 0 #0003; pointer-events:auto; }
+.combat-result[data-outcome="loss"] { border-color:#ff7965; }
+.combat-result[data-outcome="capture"] { border-color:#fff36b; }
+.combat-result-head { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+.combat-result-head small { color:#62e8ff; font:800 8px system-ui; letter-spacing:.06em; }
+.combat-result-head button { min-width:36px; min-height:32px; border:0; background:transparent; font:24px system-ui; }
+#combatDice { display:block; color:#fffbea; font:900 19px system-ui; letter-spacing:.06em; }
+#combatOutcome { margin:5px 0 2px; font:600 11px/1.4 system-ui; }
+.map-shell:has(.combat-result:not([hidden])) .threat-label, .map-shell:has(.combat-result:not([hidden])) .map-hint { visibility:hidden; }
+@media(max-height:500px) { .combat-result { max-height:calc(100% - 55px); overflow:auto; } }
+@media(prefers-reduced-motion:reduce) { button:not(:disabled):active { transform:none; } }
