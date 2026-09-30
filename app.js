@@ -188,8 +188,10 @@ function load() {
     state = parsed;
     terrain = generateTerrain(state.seed);
     state.version = VERSION;
-    state.resources = { money:Number(state.resources?.money) || START_MONEY };
-    state.aiResources = { money:Number(state.aiResources?.money) || START_MONEY };
+    const oldPlayerMoney = Number(state.resources?.money);
+    const oldAiMoney = Number(state.aiResources?.money);
+    state.resources = { money:Number.isFinite(oldPlayerMoney) ? oldPlayerMoney : START_MONEY };
+    state.aiResources = { money:Number.isFinite(oldAiMoney) ? oldAiMoney : START_MONEY };
     state.winner = state.winner || null;
     state.victoryReason = state.victoryReason || null;
     state.cells.forEach((c,i) => {
@@ -953,6 +955,7 @@ function bindEvents() {
   el("zoomOutBtn").addEventListener("click",() => setZoom(zoom-0.15));
   el("centerBtn").addEventListener("click",centerOnPlayer);
   el("newGameBtn").addEventListener("click",resetGame);
+  el("victoryNewGameBtn").addEventListener("click",() => { closeDialog("victory"); resetGame(); });
   document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click",() => closeDialog(b.dataset.close)));
   window.addEventListener("resize",resize);
   new ResizeObserver(resize).observe(mapShell);
