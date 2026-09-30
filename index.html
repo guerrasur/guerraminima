@@ -7,7 +7,7 @@
   <meta name="description" content="Guerra Mínima — prototipo de estrategia asíncrona." />
   <title>Guerra Mínima</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./style.css?v=0.2.0" />
+  <link rel="stylesheet" href="./style.css?v=0.3.0" />
 </head>
 <body>
   <main id="app">
@@ -37,7 +37,7 @@
 
     <section id="mapShell" class="map-shell" aria-label="Mapa de la partida">
       <canvas id="world"></canvas>
-      <div class="map-hint" id="mapHint">Arrastrá para recorrer · Pellizcá para zoom · Bordes claros = alcance</div>
+      <div class="map-hint" id="mapHint">Número = tropas · Blanco punteado = expandir · Rojo punteado = atacar</div>
       <div class="zoom-controls" aria-label="Zoom del mapa">
         <button id="zoomInBtn" aria-label="Acercar">+</button>
         <button id="zoomOutBtn" aria-label="Alejar">−</button>
@@ -52,15 +52,13 @@
         <strong id="selectionTitle">Tocá una zona del mapa</strong>
         <span id="selectionMeta">El mundo sigue vivo mientras decidís.</span>
       </div>
-      <button id="marketBtn" class="market-btn">Mercado</button>
     </section>
 
     <nav class="actions" aria-label="Acciones del turno">
       <button data-action="expand"><span>⚑</span>Expandir</button>
-      <button data-action="build"><span>⌂</span>Construir</button>
-      <button data-action="harvest"><span>✦</span>Recolectar</button>
-      <button data-action="explore"><span>◇</span>Explorar</button>
-      <button data-action="attack"><span>⚔</span>Intervenir</button>
+      <button data-action="reinforce"><span>♟</span>Reforzar</button>
+      <button data-action="move"><span>➜</span>Mover</button>
+      <button data-action="attack"><span>⚔</span>Atacar</button>
     </nav>
 
     <footer class="turn-footer">
@@ -69,46 +67,47 @@
     </footer>
   </main>
 
-  <dialog id="marketDialog">
-    <div class="dialog-head">
-      <div><small>MERCADO DEL CONTINENTE</small><h2>Comprar / vender</h2></div>
-      <button data-close="market">×</button>
-    </div>
-    <p class="dialog-copy">Las operaciones no gastan acciones. Máximo 3 por turno.</p>
-    <div id="marketRows"></div>
-    <div class="trade-count" id="tradeCount">0 / 3 operaciones</div>
-  </dialog>
-
   <dialog id="menuDialog">
     <div class="dialog-head">
-      <div><small>DEMO LOCAL</small><h2>Partida</h2></div>
+      <div><small>DEMO LOCAL · CONTRA IA</small><h2>Partida</h2></div>
       <button data-close="menu">×</button>
     </div>
     <button id="helpBtn" class="secondary-btn">Ver reglas y cambios</button>
     <button id="newGameBtn" class="danger-btn">Generar un continente nuevo</button>
-    <p class="dialog-copy">La partida se guarda automáticamente en este dispositivo. El rival de esta versión es automático.</p>
-    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.2.0</b></div>
+    <p class="dialog-copy">La partida se guarda automáticamente en este dispositivo. El rival juega sus 3 acciones después de que terminás tu turno.</p>
+    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.3.0</b></div>
   </dialog>
 
   <dialog id="helpDialog">
     <div class="dialog-head">
-      <div><small>GUÍA · v0.2.0</small><h2>Qué podés hacer</h2></div>
+      <div><small>GUÍA · v0.3.0</small><h2>Cómo se juega</h2></div>
       <button data-close="help">×</button>
     </div>
     <div class="help-block">
-      <p><b>3 acciones por turno.</b> Cada acción de mapa gasta 1. Comprar o vender no gasta acciones, pero hay 3 operaciones de mercado por turno.</p>
-      <p><b>Expandir</b> — cuesta 2 comida. Solo podés tomar una casilla neutral pegada por un lado a tu territorio. Esas casillas aparecen con un borde claro.</p>
-      <p><b>Construir</b> — cuesta 6 madera, 3 piedra y 4 dinero. Se usa dentro de tu territorio. Crea un asentamiento o un puesto fronterizo.</p>
-      <p><b>Recolectar</b> — se usa dentro de tu territorio y convierte 1 acción en recursos. El resultado depende del terreno: valle da más comida, bosque más madera y colinas más piedra/metal.</p>
-      <p><b>Explorar</b> — solo en ruinas sin explorar. Te da dinero y materiales; si la ruina es neutral pero toca tu frontera, también pasa a tu control.</p>
-      <p><b>Intervenir</b> — cuesta 3 comida y 1 metal. Solo contra una casilla rival pegada a tu frontera. Tiene una probabilidad de éxito.</p>
-      <p><b>Alcance</b> — no podés saltar casillas. Tu territorio crece desde los bordes, una casilla por vez.</p>
-      <p><b>Controles</b> — tocá una casilla o su edificio para seleccionarla. Arrastrá con un dedo para mover el mapa; con dos podés mover y hacer zoom a la vez. También podés usar la rueda del mouse o + / − (zoom de 55% a 180%). El botón ⌖ vuelve a tu capital. Mover y acercar el mapa no cuesta acciones ni recursos.</p>
+      <p><b>Objetivo.</b> Ganás si tomás el cuartel rival o si controlás el 60% del continente.</p>
+      <p><b>3 acciones por turno.</b> Cada movimiento, expansión, refuerzo o ataque gasta 1 acción.</p>
+      <p><b>Monedas.</b> Al empezar tu turno cobrás según cuántos territorios controlás. Reforzar cuesta ¤2 y suma 1 tropa al sector elegido.</p>
+      <p><b>Tropas.</b> El número sobre cada territorio indica cuántas hay. Siempre tiene que quedar al menos 1 tropa defendiendo un territorio.</p>
+      <p><b>Expandir.</b> Elegí una casilla neutral junto a tu frontera. Necesitás un territorio vecino con al menos 2 tropas: una de ellas pasa al nuevo territorio.</p>
+      <p><b>Mover.</b> Elegí un territorio propio con 2 o más tropas, tocá Mover y después un territorio propio vecino. Se transfiere 1 tropa.</p>
+      <p><b>Atacar.</b> Elegí un territorio rival pegado a uno tuyo con 2 o más tropas. Cada ataque tira un dado por lado: si ganás, el defensor pierde 1 tropa; empate favorece al defensor.</p>
+      <p><b>Cuarteles.</b> Si el rival conquista el tuyo, perdés. Si conquistás el suyo, ganás inmediatamente.</p>
+      <p><b>Leer al rival.</b> Borde rojo punteado = territorio que podés atacar. Mirá dónde acumula tropas: esas fronteras son su amenaza inmediata. Al terminar su turno, abajo aparece un resumen de lo que hizo.</p>
+      <p><b>Controles.</b> Arrastrá con un dedo para mover el mapa; pellizcá para zoom. También podés usar + / −. El botón ⌖ vuelve a tu cuartel.</p>
     </div>
     <div class="changelog">
-      <small>NUEVO EN v0.2.0</small>
-      <p>Nueva estética de cómic: bosques verde ácido, colinas naranjas y agua azul, con trazos de tinta. Edificios claros y habitantes ilustrados. Tu territorio lleva + y el rival ×. Borde blanco continuo = selección; blanco punteado = expansión disponible; rojo punteado = rival alcanzable. Se conservan las 3 acciones por turno, las reglas, tu partida y los controles táctiles corregidos.</p>
+      <small>NUEVO EN v0.3.0</small>
+      <p>El juego ahora gira alrededor de territorio, monedas y tropas. Se eliminaron mercado, ruinas y recursos secundarios. Hay 3 acciones claras por turno, combate con dados, refuerzos, movimiento de tropas y dos condiciones de victoria: tomar el cuartel rival o llegar al 60% del continente. Se conserva la estética, el mapa isométrico y los controles táctiles de v0.2.0.</p>
     </div>
+  </dialog>
+
+  <dialog id="victoryDialog">
+    <div class="dialog-head">
+      <div><small>FIN DE PARTIDA</small><h2 id="victoryTitle">VICTORIA</h2></div>
+      <button data-close="victory">×</button>
+    </div>
+    <p id="victoryText" class="dialog-copy"></p>
+    <button id="victoryNewGameBtn" class="danger-btn">NUEVO CONTINENTE</button>
   </dialog>
 
   <div id="updateOverlay" class="update-overlay" hidden>
@@ -120,6 +119,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=0.2.0"></script>
+  <script type="module" src="./app.js?v=0.3.0"></script>
 </body>
 </html>
