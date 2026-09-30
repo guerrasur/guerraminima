@@ -56,7 +56,7 @@ Si el rival conquista tu cuartel o alcanza antes el 60%, perdés.
 
 ### Turno
 
-Cada jugador tiene 3 acciones por turno. Las acciones posibles son:
+Cada jugador tiene 6 acciones por turno y no hay temporizador ni cierre automático. Las acciones posibles son:
 
 - **Expandir:** ocupar una casilla neutral adyacente. Requiere que un territorio propio vecino tenga al menos 2 tropas; 1 tropa pasa al territorio nuevo.
 - **Reforzar:** cuesta ¤2 y agrega 1 tropa al territorio seleccionado.
