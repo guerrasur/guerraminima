@@ -2,20 +2,22 @@
 
 Prototipo mobile-first de estrategia asíncrona por turnos.
 
-## v0.1.0 — demo local
+## v0.1.1 — demo local
 
 Esta primera versión no necesita backend ni otro jugador. Corre enteramente en el navegador y guarda la partida en \`localStorage\`.
 
 Incluye:
 
 - continente procedural con vista isométrica;
-- cámara táctil: arrastrar con el dedo para recorrer el mapa;
+- cámara táctil: arrastrar con el dedo para recorrer el mapa, con pinch-to-zoom y botones +/−;
 - dos países reales elegidos al azar con sus banderas;
 - valle central, bosques, colinas, costa y ruinas;
 - nombre procedural para cada conflicto;
 - mundo visualmente vivo con habitantes, humo y banderas;
 - 3 acciones por turno;
-- acciones: expandir, construir, desarrollar, explorar ruinas e intervenir territorio rival;
+- acciones: expandir, construir, recolectar, explorar ruinas e intervenir territorio rival;
+- alcance visible: casillas neutrales adyacentes a tu territorio aparecen marcadas y las fronteras rivales alcanzables también;
+- guía/changelog dentro del juego, mostrada automáticamente al abrir una versión nueva;
 - mercado de comida, madera, piedra y metal, con hasta 3 transacciones por turno;
 - rival automático que realiza sus 3 movimientos;
 - guardado automático local;
