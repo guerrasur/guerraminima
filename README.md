@@ -2,17 +2,15 @@
 
 Prototipo mobile-first de estrategia por turnos. Funciona enteramente en el navegador, guarda la partida en `localStorage` y se publica como sitio estático en GitHub Pages.
 
-## v0.4.0 — Puntos calientes
+## v0.5.0 — Puntos calientes y mapa despejado
 
 1. **Tres puestos estratégicos:** Paso Oeste (12,14), Valle Central (20,14), Paso Este (27,14), coordenadas internas desde 0. Cada puesto genera +¤2 por turno para su dueño.
-2. **Victoria por control:** mantener al menos dos puestos durante tres cierres de ronda consecutivos. Se cuenta después del turno IA y se reinicia al perder el segundo puesto, incluso si se recupera en esa ronda. Siguen vigentes cuartel y 60%.
-3. **Etapas compartidas:** turnos 1–7 refuerzo +1; 8–15 +2; desde 16 +3. Siempre ¤2 y una acción para ambos jugadores.
-4. **Fortificar:** ¤4 y una acción, en territorio propio. Un escudo por sector absorbe la próxima tirada defensiva perdida y se consume sin bajas. Se puede reconstruir.
-5. **Hitos:** 30 territorios, primer puesto, dos puestos. Cada hito paga ¤6 una sola vez por bando y partida.
-6. **Lectura visual:** estrellas, barra de control, ingreso, aviso de amenazas actuales, destinos de movimiento y botón para recorrer objetivos.
-7. **IA y parte de guerra:** expansión orientada a puestos, fortificaciones de objetivos expuestos y resumen completo de sus acciones en PARTE.
+2. **Fortificar:** está en Tienda / más opciones. Cuesta ¤4 y una acción; un escudo absorbe la próxima tirada defensiva perdida.
+3. **Hitos:** 30 territorios, primer puesto y dos puestos dan +¤6 una sola vez por partida.
+4. **Refuerzo gratuito:** sumar 1 tropa cuesta una acción, pero no monedas.
+5. **Lectura visual:** estrellas, aviso de amenazas actuales, destinos de movimiento y botón para recorrer objetivos. Se redujeron paneles inferiores para darle más altura al mapa.
 
-Los saves anteriores se migran agregando puestos y progreso, conservando monedas, tropas, dueño de las casillas y ganador. La guía se muestra una vez al abrir la versión. Pruebas de campaña, escudos, economía, migración y acciones pendientes se suman a las pruebas táctiles.
+Los saves anteriores se migran agregando puestos y progreso, conservando monedas, tropas, dueño de las casillas y ganador. La guía se muestra una vez al abrir la versión. La actualización elimina la victoria por puestos, las etapas de refuerzo y el parte de guerra.
 
 ## Reglas base (v0.3.0; cambios de v0.4.0 arriba)
 

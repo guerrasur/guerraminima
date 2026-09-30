@@ -62,5 +62,5 @@ Esta documentación forma parte de la funcionalidad, no es opcional. Una feature
 ## Dirección visual (v0.2.0)
 Cómic psicodélico con tinta negra, verde ácido, ocre/naranja y azul; paneles negros y bordes blancos. Mantener texturas deterministas, lectura territorial +/× y selección visible. No alterar proyección/picking para decorar el terreno; conservar pruebas táctiles.
 
-## Campaña v0.4.0
-Reglas actuales en README y guía in-game: tres puestos, victoria por mantener dos durante tres cierres de ronda, hitos únicos, escudos consumibles y refuerzos por etapas 1/8/16. Ambos bandos comparten costes y beneficios. Conservar contadores y hitos al cargar; nunca pagar recompensas dos veces. Los 7 puntos de la release están numerados para facilitar ajustes pedidos por el usuario.
+## Campaña v0.5.0
+Reglas actuales en README y guía in-game: tres puestos, hitos únicos, escudos consumibles y refuerzos gratuitos. La victoria solo ocurre por cuartel o 60% del territorio. Fortificar está dentro de Tienda / más opciones, fuera de las acciones principales. Mantener la vista del mapa amplia y evitar paneles negros innecesarios.

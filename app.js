@@ -1,24 +1,19 @@
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 const SAVE_KEY = "guerra-minima-save-v1";
 const W = 40;
 const H = 28;
 const TW = 48;
 const TH = 24;
 const MAX_AP = 3;
-const REINFORCE_COST = 2;
 const TERRITORY_WIN = 0.60;
 const START_MONEY = 12;
 const CAPITAL_TROOPS = 6;
 const FORT_COST = 4;
 const POSTS = [idx(12,14), idx(20,14), idx(27,14)];
 const POST_NAMES = ["Paso Oeste", "Valle Central", "Paso Este"];
-function phase() { return state.turn >= 16 ? 2 : state.turn >= 8 ? 1 : 0; }
-function reinforcementSize() { return phase() + 1; }
 function postCount(owner) { return POSTS.filter(i => state.cells[i].owner === owner).length; }
 function initializeCampaign() {
-  state.hold ||= {p:0, ai:0};
   state.milestones ||= {p:[], ai:[]};
-  state.report ||= [];
   for (const i of POSTS) state.cells[i].building = "outpost";
   for (const c of state.cells) c.fort = !!c.fort;
 }
@@ -32,12 +27,6 @@ function rewardMilestones(owner) {
       if (owner === "p") addLog("Hito: " + names[i] + ". +¤6 (una sola vez).");
     }
   });
-}
-function updateHold() {
-  for (const owner of ["p","ai"]) {
-    state.hold[owner] = postCount(owner) >= 2 ? state.hold[owner] + 1 : 0;
-    if (state.hold[owner] >= 3) { setWinner(owner, owner === "p" ? "mantuviste dos puestos durante 3 rondas" : "el rival mantuvo dos puestos durante 3 rondas"); return; }
-  }
 }
 
 const COUNTRIES = [
@@ -202,7 +191,7 @@ function newState() {
     winner:null,
     victoryReason:null,
     log:["Avanzá hacia los puestos ★. Mantené 2 durante 3 rondas para ganar."],
-    hold:{p:0,ai:0}, milestones:{p:[],ai:[]}, report:[]
+    milestones:{p:[],ai:[]}
   };
   for (const i of POSTS) fresh.cells[i].building = "outpost";
   return fresh;
@@ -276,7 +265,7 @@ function troopTotal(owner) {
 }
 
 function incomeFor(owner) {
-  return Math.max(2, Math.floor(territoryCount(owner) / 5)) + postCount(owner)*2;
+  return Math.max(2, Math.floor(territoryCount(owner) / 5));
 }
 
 function strongestAdjacent(i, owner) {
@@ -303,15 +292,9 @@ function syncUI() {
     '<div class="resource"><span>♟</span><b>' + troopTotal("p") + '</b><small>tropas</small></div>' +
     '<div class="resource"><span>⚑</span><b>' + pct + '%</b><small>territorio · meta 60%</small></div>';
 
-  const stage = ["I · EXPLORACIÓN", "II · OFENSIVA", "III · GUERRA TOTAL"][phase()];
-  el("phaseLabel").textContent = stage + " · refuerzo +" + reinforcementSize();
-  el("campaignStatus").textContent = "★ Vos " + postCount("p") + "/3 · " + state.hold.p + "/3 rondas | Rival " + postCount("ai") + "/3 · " + state.hold.ai + "/3";
-  el("campaignMeter").style.width = (state.hold.p / 3 * 100) + "%";
-  el("incomeLabel").textContent = "+¤" + incomeFor("p") + "/turno";
   const threats = state.cells.filter((c,i) => c.owner === "p" && strongestAdjacent(i,"ai") != null).length;
   el("threatLabel").textContent = threats ? "⚠ " + threats + " sectores bajo amenaza" : "Sin ataques posibles del rival en tu frontera";
   el("threatLabel").classList[threats ? "add" : "remove"]("danger");
-  el("reinforceLabel").textContent = "+" + reinforcementSize() + " · ¤2";
   updateSelectionUI();
 }
 
@@ -333,7 +316,7 @@ function updateSelectionUI() {
     if (c.building === "outpost") title = "★ " + POST_NAMES[POSTS.indexOf(selected)];
     const bits = [ownerLabel(c.owner), "sector " + (pos.x+1) + "." + (pos.y+1)];
     if (c.owner) bits.push((c.troops || 0) + ((c.troops || 0) === 1 ? " tropa" : " tropas"));
-    if (c.building === "outpost") bits.push("+¤2/turno · objetivo de victoria");
+    if (c.building === "outpost") bits.push("objetivo estratégico");
     if (c.fort) bits.push("escudo: absorbe 1 derrota defensiva");
     if (c.owner === null && isLand(selected)) {
       bits.push(strongestAdjacent(selected,"p") != null ? "PODÉS EXPANDIR" : "necesitás 2 tropas en un vecino");
@@ -355,6 +338,8 @@ function updateSelectionUI() {
   document.querySelectorAll(".actions button").forEach((button) => {
     button.disabled = !canAction(button.dataset.action);
   });
+  const storeFortify = el("storeFortifyBtn");
+  if (storeFortify) storeFortify.disabled = !canAction("fortify");
 }
 
 function canAction(action) {
@@ -362,7 +347,7 @@ function canAction(action) {
   const c = state.cells[selected];
   if (action === "expand") return isLand(selected) && c.owner === null && strongestAdjacent(selected,"p") != null;
   if (action === "fortify") return c.owner === "p" && !c.fort && state.resources.money >= FORT_COST;
-  if (action === "reinforce") return c.owner === "p" && state.resources.money >= REINFORCE_COST;
+  if (action === "reinforce") return c.owner === "p";
   if (action === "move") return c.owner === "p" && c.troops > 1;
   if (action === "attack") return c.owner === "ai" && strongestAdjacent(selected,"p") != null;
   return false;
@@ -391,10 +376,8 @@ function setWinner(owner, reason) {
 
 function checkVictory() {
   if (state.winner) return state.winner;
-  for (const owner of ["p","ai"]) {
-    if (postCount(owner) < 2) state.hold[owner] = 0;
-    rewardMilestones(owner);
-  }
+  rewardMilestones("p");
+  rewardMilestones("ai");
   if (state.cells[state.enemyCapital].owner === "p") {
     setWinner("p","tomaste el cuartel rival");
     return "p";
@@ -504,9 +487,8 @@ function act(action) {
   }
 
   if (action === "reinforce") {
-    state.resources.money -= REINFORCE_COST;
-    c.troops += reinforcementSize();
-    addLog("Reforzaste el sector: +" + reinforcementSize() + " tropas por ¤" + REINFORCE_COST + ".");
+    c.troops += 1;
+    addLog("Reforzaste el sector: +1 tropa gratis.");
   }
 
   if (action === "fortify") {
@@ -596,15 +578,14 @@ function aiTurn() {
       state.cells[exposedPost].fort = true; state.aiResources.money -= FORT_COST;
       note.push("fortificó un objetivo"); continue;
     }
-    if (state.aiResources.money >= REINFORCE_COST && reinforceables.length) {
+    if (reinforceables.length) {
       const frontier = reinforceables.filter((i) => neighbors(i).some((n) => state.cells[n].owner !== "ai" && isLand(n)));
       const pool = frontier.length ? frontier : reinforceables;
       const goals = POSTS.filter(i => state.cells[i].owner !== "ai");
       const score = i => Math.min(...(goals.length ? goals : [state.playerCapital]).map(t => Math.abs(xy(i).x-xy(t).x)+Math.abs(xy(i).y-xy(t).y))) + state.cells[i].troops*2;
       pool.sort((a,b) => score(a)-score(b));
       const i = pool[0];
-      state.aiResources.money -= REINFORCE_COST;
-      state.cells[i].troops += reinforcementSize();
+      state.cells[i].troops += 1;
       note.push("reforzó su frontera");
       continue;
     }
@@ -620,21 +601,17 @@ function endTurn() {
   moveSource = null;
   grantIncome("ai");
   const note = aiTurn();
-  state.report = note;
-  if (!state.winner) updateHold();
   if (state.winner) {
     save();
     syncUI();
     return;
   }
-  const oldPhase = phase();
   state.turn++;
   state.day++;
   state.ap = MAX_AP;
   const playerIncome = grantIncome("p");
   const summary = note.length ? "Rival: " + note.slice(0,3).join(" · ") + "." : "Rival: consolidó su territorio.";
   addLog(summary + " Vos recibís ¤" + playerIncome + " por tus territorios.");
-  if (phase() !== oldPhase) addLog("Nueva etapa: reforzar ahora suma " + reinforcementSize() + " tropas por ¤2.");
   save();
   syncUI();
   toast("Es tu turno. Ingreso: ¤" + playerIncome + ".");
@@ -973,7 +950,7 @@ function toast(text) {
 }
 
 function closeDialog(which) {
-  const d = which === "help" ? el("helpDialog") : which === "victory" ? el("victoryDialog") : el("menuDialog");
+  const d = which === "help" ? el("helpDialog") : which === "victory" ? el("victoryDialog") : which === "store" ? el("storeDialog") : el("menuDialog");
   if (d.open) d.close();
 }
 
@@ -1040,12 +1017,8 @@ function bindEvents() {
     const current = POSTS.indexOf(selected);
     selected = POSTS[(current+1)%POSTS.length]; centerOnTile(selected); updateSelectionUI();
   });
-  el("reportBtn").addEventListener("click",() => {
-    el("reportText").textContent = state.report.length ? state.report.map((line,i) => (i+1)+". "+line).join("\n") : "El rival todavía no jugó.";
-    el("missionText").textContent = ["Controlar 30 territorios", "Capturar un puesto", "Controlar dos puestos"].map((label,i) => (state.milestones.p.includes(i) ? "✓ " : "○ ")+label+" · +¤6").join("\n");
-    el("reportDialog").showModal();
-  });
-  el("closeReportBtn").addEventListener("click",() => el("reportDialog").close());
+  el("storeBtn").addEventListener("click",() => { closeDialog("menu"); el("storeDialog").showModal(); });
+  el("storeFortifyBtn").addEventListener("click",() => { closeDialog("store"); act("fortify"); });
   el("endTurnBtn").addEventListener("click",endTurn);
   el("menuBtn").addEventListener("click",() => el("menuDialog").showModal());
   el("helpBtn").addEventListener("click",() => { closeDialog("menu"); el("helpDialog").showModal(); });

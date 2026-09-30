@@ -131,12 +131,12 @@ test('new game starts with the simplified economy and defended HQs',()=>{
   assert.equal(run('state.cells.some(c=>c.ruin)'),false);
 });
 
-test('reinforce spends one action and two coins for one troop',()=>{
+test('reinforce is free and spends one action for one troop',()=>{
   const {run}=setup();
   run('selected=state.playerCapital');
   const before=run('({money:state.resources.money,troops:state.cells[selected].troops,ap:state.ap})');
   run('act("reinforce")');
-  assert.equal(run('state.resources.money'),before.money-2);
+  assert.equal(run('state.resources.money'),before.money);
   assert.equal(run('state.cells[selected].troops'),before.troops+1);
   assert.equal(run('state.ap'),before.ap-1);
 });
@@ -164,25 +164,24 @@ test('capturing the enemy HQ ends the match immediately',()=>{
   assert.equal(run('state.victoryReason'),'tomaste el cuartel rival');
 });
 
-test('campaign stages affect both sides and keep the same reinforcement price',()=>{
+test('reinforce remains free at every turn',()=>{
   const {run}=setup();
-  for(const [turn,size] of [[1,1],[7,1],[8,2],[15,2],[16,3]]) {
+  for(const turn of [1,8,16,30]) {
     run(`state.turn=${turn};state.ap=3;state.resources.money=20;selected=state.playerCapital`);
     const before=run('state.cells[selected].troops');run('act("reinforce")');
-    assert.equal(run('state.cells[selected].troops'),before+size);
-    assert.equal(run('state.resources.money'),18);
+    assert.equal(run('state.cells[selected].troops'),before+1);
+    assert.equal(run('state.resources.money'),20);
   }
 });
-test('outpost income, one-time rewards and consecutive control victory',()=>{
+test('outposts do not alter income and milestones remain one-time rewards',()=>{
   const {run}=setup();
   const before=run('incomeFor("p")');
   run('for(const i of POSTS.slice(0,2)){state.cells[i].owner="p";state.cells[i].troops=1;}checkVictory()');
-  assert.ok(run('incomeFor("p")')>=before+4);
+  assert.equal(run('incomeFor("p")'),before);
   assert.equal(run('state.resources.money'),24);
-  run('checkVictory();updateHold();updateHold()');
-  assert.equal(run('state.resources.money'),24);assert.equal(run('state.winner'),null);
-  run('state.cells[POSTS[1]].owner="ai";checkVictory()');assert.equal(run('state.hold.p'),0);
-  run('state.cells[POSTS[1]].owner="p";updateHold();updateHold();updateHold()');assert.equal(run('state.winner'),'p');
+  run('checkVictory()');
+  assert.equal(run('state.winner'),null);
+  assert.equal(run('state.resources.money'),24);
 });
 test('fortification absorbs exactly one successful attack with no troop loss',()=>{
   const {run}=setup();
@@ -192,13 +191,13 @@ test('fortification absorbs exactly one successful attack with no troop loss',()
   assert.equal(run('state.cells[state.playerCapital].troops'),6);
   assert.equal(run('state.cells[state.playerCapital].fort'),false);
 });
-test('load preserves campaign progress and migrates old saves without wiping troops',()=>{
+test('load preserves milestones and fortifications without wiping troops',()=>{
   const {run}=setup();
-  run('initializeCampaign();state.hold.p=2;state.milestones.p=[0];state.cells[state.playerCapital].fort=true;state.cells[state.playerCapital].troops=12;let saved=JSON.stringify(state);localStorage.getItem=()=>saved;load()');
-  assert.equal(run('state.hold.p'),2);assert.equal(run('state.cells[state.playerCapital].fort'),true);
+  run('initializeCampaign();state.milestones.p=[0];state.cells[state.playerCapital].fort=true;state.cells[state.playerCapital].troops=12;let saved=JSON.stringify(state);localStorage.getItem=()=>saved;load()');
+  assert.equal(run('state.milestones.p[0]'),0);assert.equal(run('state.cells[state.playerCapital].fort'),true);
   assert.equal(run('state.cells[state.playerCapital].troops'),12);
-  run('delete state.hold;delete state.milestones;delete state.report;saved=JSON.stringify(state);load()');
-  assert.equal(run('state.hold.p'),0);assert.equal(run('POSTS.every(i=>state.cells[i].building==="outpost")'),true);
+  run('delete state.milestones;saved=JSON.stringify(state);load()');
+  assert.equal(run('state.milestones.p.length'),0);assert.equal(run('POSTS.every(i=>state.cells[i].building==="outpost")'),true);
 });
 test('pending troop movement cannot spend an exhausted action or act after victory',()=>{
   const {run}=setup();

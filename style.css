@@ -59,11 +59,11 @@ h1 { margin:0; font-size:17px; letter-spacing:.12em; line-height:1; }
 .selection span { display:block; font:500 9px system-ui,sans-serif; opacity:.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .market-btn { flex:none; padding:8px 10px; border:1px solid #776e59; border-radius:6px; background:#0b0c09; font:800 10px system-ui,sans-serif; text-transform:uppercase; }
 
-.actions { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; padding:5px 6px; background:#0b0c09; border-top:1px solid #aaa18b; }
+.actions { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; padding:4px 6px; background:#151d10; border-top:1px solid #7f8d5b; }
 .actions button { min-width:0; height:50px; padding:3px 1px; border:1px solid #8e866f; border-radius:6px; background:#0b0c09; font:700 8px system-ui,sans-serif; text-transform:uppercase; }
 .actions button span { display:block; font:20px/22px Georgia,serif; }
 
-.turn-footer { display:flex; align-items:center; gap:8px; padding:6px 8px calc(6px + env(safe-area-inset-bottom)); background:#0b0c09; color:#f5eedb; }
+.turn-footer { display:flex; align-items:center; gap:8px; padding:5px 8px calc(5px + env(safe-area-inset-bottom)); background:#151d10; color:#f5eedb; }
 #lastEvent { flex:1; min-width:0; font:600 9px/1.2 system-ui,sans-serif; opacity:.78; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #endTurnBtn { flex:none; border:1px solid #c7b98f; border-radius:6px; background:#ffb52b; color:#0b0c09; padding:9px 10px; font:900 9px system-ui,sans-serif; letter-spacing:.06em; }
 
@@ -118,12 +118,12 @@ h1 { letter-spacing:.025em; font-size:21px; }
 .selection { border-top:2px solid #fffbea; }
 .selection strong { font-size:15px; }
 .selection span,.dialog-copy { opacity:.9; }
-.actions { gap:5px; border-top:0; padding:5px 7px 7px; }
+.actions { gap:5px; border-top:0; padding:4px 7px 5px; }
 .actions button { height:53px; font-size:9px; }
 button:disabled { opacity:.4; filter:none; }
 button:focus-visible { outline:3px solid #bbed3d; outline-offset:2px; }
 button:not(:disabled):active { background:#bbed3d; color:#0b0c09; }
-.turn-footer { border-top:1px solid #fffbea; }
+.turn-footer { border-top:1px solid #7f8d5b; }
 #endTurnBtn { background:#ffb52b; border:2px solid #fffbea; color:#0b0c09; min-height:44px; font-size:10px; }
 .map-hint { left:8px; transform:none; max-width:calc(100% - 68px); white-space:normal; border:1px solid #fffbea; border-radius:4px; background:#0b0c09; }
 .toast { background:#0b0c09; border:1px solid #fffbea; }
@@ -135,19 +135,19 @@ dialog,.update-card { background:#0b0c09; color:#fffbea; border:2px solid #fffbe
 @media(max-height:600px) { .hud { padding-top:5px; } .versus { margin-top:3px; } .actions button { height:44px; } }
 
 /* v0.4 campaign instruments */
-.campaign { margin-top:7px; padding-top:6px; border-top:1px solid #454839; font:700 9px/1.4 system-ui,sans-serif; }
+.campaign { display:none; }
 .campaign > div:first-child { display:flex; justify-content:space-between; color:#bbed3d; gap:6px; }
 .campaign p { margin:2px 0 4px; font-size:9px; }
 .campaign-track { height:4px; background:#373b2b; overflow:hidden; }
 .campaign-track i { display:block; height:100%; background:#bbed3d; transition:width .3s; }
-.actions { grid-template-columns:repeat(5,minmax(0,1fr)); }
+.actions { grid-template-columns:repeat(4,minmax(0,1fr)); }
 .actions button { font-size:8px; }
 .actions button b { font-weight:700; }
-.actions button:not(:disabled) { border-color:#bbed3d; background:#18200f; }
-.selection { min-height:70px; }
+.actions button:not(:disabled) { border-color:#bbed3d; background:#243319; }
+.selection { min-height:56px; background:#151d10; }
 .selection span { white-space:normal; font-size:10px; line-height:1.35; }
 .map-tools { position:absolute; left:8px; bottom:8px; display:flex; gap:5px; }
-.map-tools button { min-height:40px; padding:7px 10px; border:1px solid #fffbea; border-radius:4px; background:#0b0c09; font:800 10px system-ui; }
+.map-tools button { min-height:36px; padding:6px 10px; border:1px solid #fffbea; border-radius:4px; background:#243319; font:800 10px system-ui; }
 .threat-label { position:absolute; left:8px; top:52px; max-width:calc(100% - 70px); color:#fffbea; background:#0b0c09; padding:5px 7px; font:700 9px system-ui; pointer-events:none; border-left:3px solid #bbed3d; }
 .threat-label.danger { border-color:#ff7965; color:#ffb09e; }
 .toast { bottom:58px; }
