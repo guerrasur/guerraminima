@@ -1,67 +1,94 @@
 # Guerra Mínima
 
-Prototipo mobile-first de estrategia asíncrona por turnos.
+Prototipo mobile-first de estrategia por turnos. Funciona enteramente en el navegador, guarda la partida en `localStorage` y se publica como sitio estático en GitHub Pages.
 
-## v0.1.1 — demo local
+## v0.3.0 — núcleo de juego
 
-Esta primera versión no necesita backend ni otro jugador. Corre enteramente en el navegador y guarda la partida en \`localStorage\`.
+La demo mantiene el mapa isométrico, la estética de tinta/colores planos y los controles táctiles de v0.2.0, pero simplifica por completo las reglas.
 
-Incluye:
+### Objetivo
 
-- continente procedural con vista isométrica;
-- cámara táctil: arrastrar con el dedo para recorrer el mapa, con pinch-to-zoom y botones +/−;
-- dos países reales elegidos al azar con sus banderas;
-- valle central, bosques, colinas, costa y ruinas;
-- nombre procedural para cada conflicto;
-- mundo visualmente vivo con habitantes, humo y banderas;
-- 3 acciones por turno;
-- acciones: expandir, construir, recolectar, explorar ruinas e intervenir territorio rival;
-- alcance visible: casillas neutrales adyacentes a tu territorio aparecen marcadas y las fronteras rivales alcanzables también;
-- guía/changelog dentro del juego, mostrada automáticamente al abrir una versión nueva;
-- mercado de comida, madera, piedra y metal, con hasta 3 transacciones por turno;
-- rival automático que realiza sus 3 movimientos;
-- guardado automático local;
-- PWA/service worker y detección de versiones nuevas.
+Hay dos formas de ganar:
 
-## Objetivo del prototipo
+- conquistar el cuartel rival;
+- controlar al menos el 60% del territorio terrestre del continente.
 
-Comprobar si resulta entretenido entrar a un pequeño continente, recorrerlo y tomar tres decisiones importantes por turno. La estética busca sensación de RTS clásico (AoE / Clash of Clans), pero el ritmo es asíncrono y pausado.
+Si el rival conquista tu cuartel o alcanza antes el 60%, perdés.
 
-Más adelante, el rival automático puede reemplazarse por otro jugador sin cambiar el núcleo del tablero.
+### Turno
+
+Cada jugador tiene 3 acciones por turno. Las acciones posibles son:
+
+- **Expandir:** ocupar una casilla neutral adyacente. Requiere que un territorio propio vecino tenga al menos 2 tropas; 1 tropa pasa al territorio nuevo.
+- **Reforzar:** cuesta ¤2 y agrega 1 tropa al territorio seleccionado.
+- **Mover:** mueve 1 tropa entre dos territorios propios adyacentes. El territorio de origen debe conservar al menos 1.
+- **Atacar:** ataca un territorio rival adyacente desde el territorio propio vecino con más tropas disponibles.
+
+### Combate
+
+Cada ataque tira 1d6 para atacante y defensor.
+
+- si el atacante obtiene más, el defensor pierde 1 tropa;
+- empate o resultado menor favorece al defensor y el atacante pierde 1 tropa;
+- cuando un territorio defensor llega a 0 tropas, cambia de dueño y recibe 1 tropa atacante;
+- capturar el cuartel termina la partida inmediatamente.
+
+### Economía
+
+Solo existe una moneda.
+
+Al comenzar cada turno se reciben monedas según la cantidad de territorios controlados:
+
+`max(2, floor(territorios / 5))`
+
+Las monedas se usan para reforzar tropas. Se eliminaron mercado, comida, madera, piedra, metal, recolección y ruinas como mecánicas jugables.
+
+### Leer al rival
+
+Las tropas son visibles sobre cada territorio.
+
+- borde blanco punteado: territorio neutral que podés ocupar;
+- borde rojo punteado: territorio rival que podés atacar;
+- al terminar el turno rival aparece un resumen de sus movimientos;
+- una acumulación de tropas cerca de tu frontera o cuartel representa una amenaza inmediata.
+
+El rival automático usa las mismas ideas básicas: expandirse, reforzar, mover tropas y atacar.
+
+## Controles
+
+- toque: seleccionar territorio;
+- arrastrar: mover la cámara;
+- pellizcar: zoom;
+- botones + / −: zoom alternativo;
+- ⌖: volver al cuartel.
+
+Mover la cámara o hacer zoom no consume acciones.
 
 ## Publicación
 
-El sitio es estático y está pensado para GitHub Pages desde la raíz de \`main\`.
-
-No requiere Firebase, servidor ni secretos.
+No requiere Firebase, servidor ni secretos. GitHub Pages sirve la raíz de `main`.
 
 ## Regla de versiones
 
-La actualización del cliente sigue la misma idea usada en Pelao Bolao: \`version.json\` permite que una pestaña abierta detecte que existe una versión más nueva y obligue a recargar.
-
 Al publicar una versión, actualizar juntos:
 
-1. \`VERSION\` en \`app.js\`.
-2. \`version.json\`.
-3. Los query strings \`?v=X.Y.Z\` de \`index.html\`.
-4. El nombre de caché y URLs versionadas de \`sw.js\`.
+1. `VERSION` en `app.js`;
+2. `version.json`;
+3. query strings `?v=X.Y.Z` de `index.html`;
+4. nombre de caché y URLs versionadas de `sw.js`.
 
-No borrar ni renombrar \`guerra-minima-save-v1\` salvo que exista una migración explícita del estado guardado.
+No borrar ni renombrar `guerra-minima-save-v1` salvo que exista una migración explícita. v0.3.0 migra las partidas anteriores al sistema de tropas/moneda única.
 
+## Regla de documentación
 
-## Regla de documentación de mecánicas
+Toda mecánica o control nuevo debe quedar explicado también dentro de la guía/changelog del juego, incluyendo coste, alcance, límites y condición de uso.
 
-Toda mecánica o control nuevo debe documentarse también dentro de la guía/changelog del juego. La explicación debe indicar qué hace, coste, alcance o límite y condiciones de uso. La guía debe seguir disponible desde el menú y mostrarse una vez al entrar a cada versión nueva.
+## Pruebas
 
+Sin dependencias:
 
-## v0.1.2 — mapa y controles
+```bash
+node --test tests/map.test.cjs
+```
 
-Se conservan las proporciones isométricas de v0.1.0. El lienzo ya no altera el tamaño de la grilla y se sincroniza con el espacio disponible, también al girar el teléfono. El terreno se dibuja antes de los objetos; tocar un edificio selecciona su sector.
-
-El arrastre sigue al dedo sin interpolación y el zoom conserva el punto del mapa entre ambos dedos. Soltar un dedo permite continuar arrastrando sin saltos; cancelar un gesto no selecciona. La rueda del mouse también permite hacer zoom. Una nueva partida vuelve a la capital. La limpieza de caché se limita a Guerra Mínima, sin borrar cachés de otros juegos del mismo dominio.
-
-Pruebas de regresión sin dependencias: `node --test tests/map.test.cjs`.
-
-## v0.2.0 — tinta y colores planos
-
-Dirección visual de cómic psicodélico: terrenos verde ácido, ocre y azul; texturas deterministas ancladas al mapa; palmeras, colinas, ruinas y edificios dibujados con Canvas. Interfaz negra con bordes blancos y botones táctiles de al menos 44 px. Territorios identificados con + (vos) y × (rival), además del color. La selección se dibuja encima de los objetos. Sin recursos externos ni cambios en reglas, guardado o geometría táctil.
+Las pruebas cubren geometría isométrica, selección táctil, drag/pinch, alineación del canvas, selección de edificios, orden de render y sincronización de versiones.
