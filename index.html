@@ -7,7 +7,7 @@
   <meta name="description" content="Guerra Mínima — prototipo de estrategia asíncrona." />
   <title>Guerra Mínima</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./style.css?v=0.7.0" />
+  <link rel="stylesheet" href="./style.css?v=0.8.0" />
 </head>
 <body>
   <main id="app">
@@ -46,6 +46,17 @@
       <div id="threatLabel" class="threat-label"></div>
       <button id="centerBtn" class="center-btn">⌖</button>
       <div id="toast" class="toast" aria-live="polite"></div>
+      <aside id="rivalBriefing" class="rival-briefing" hidden aria-live="polite">
+        <div class="briefing-head">
+          <div><small>AL VOLVER A TU TURNO</small><strong id="rivalBriefingTitle">Parte rival</strong></div>
+          <button id="briefingDismissBtn" aria-label="Cerrar resumen rival">×</button>
+        </div>
+        <div id="rivalBriefingBody" class="briefing-body"></div>
+        <div class="briefing-actions">
+          <button id="briefingHistoryBtn">VER HISTORIAL</button>
+          <button id="briefingOkBtn">ENTENDIDO</button>
+        </div>
+      </aside>
     </section>
 
     <section id="selection" class="selection">
@@ -54,11 +65,12 @@
         <strong id="selectionTitle">Tocá una zona del mapa</strong>
         <span id="selectionMeta">El mundo sigue vivo mientras decidís.</span>
       </div>
+      <button id="storeBtn" class="market-btn" aria-label="Abrir tienda">TIENDA · ¤12</button>
     </section>
 
     <nav class="actions" aria-label="Acciones del turno">
       <button data-action="expand"><span>⚑</span>Expandir</button>
-      <button data-action="reinforce"><span>♟</span><b id="reinforceLabel">Reforzar +1</b></button>
+      <button data-action="reinforce"><span>♟</span><b id="reinforceLabel">Reforzar +2</b></button>
       <button data-action="move"><span>➜</span>Mover</button>
       <button data-action="attack"><span>⚔</span>Atacar</button>
     </nav>
@@ -79,25 +91,23 @@
     </div>
     <button id="tutorialBtn" class="secondary-btn">Tutorial completo · aprender de pe a pa</button>
     <button id="helpBtn" class="secondary-btn">Reglas y referencia rápida</button>
-    <button id="storeBtn" class="secondary-btn">Tienda / más opciones</button>
     <button id="newGameBtn" class="danger-btn">Generar un continente nuevo</button>
     <p class="dialog-copy">La partida se guarda automáticamente en este dispositivo. El rival juega después de que cerrás tu turno. No existe temporizador: una ronda puede durar varios minutos o quedar esperando hasta que vuelvas.</p>
-    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.7.0</b></div>
+    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.8.0</b></div>
   </dialog>
 
   <dialog id="helpDialog">
     <div class="dialog-head">
-      <div><small>REGLAS · v0.7.0</small><h2>Cómo se juega</h2></div>
+      <div><small>REGLAS · v0.8.0</small><h2>Cómo se juega</h2></div>
       <button data-close="help">×</button>
     </div>
-    <div class="changelog"><small>NUEVO EN v0.7.0 · PENSAR ANTES DE CERRAR</small>
+    <div class="changelog"><small>NUEVO EN v0.8.0 · ENTRAR AL TURNO INFORMADO</small>
       <ol>
-        <li><b>REPLANTEAR.</b> Antes del primer ataque podés volver al estado exacto del inicio de tu ronda sin borrar tus marcas PLAN.</li>
-        <li><b>Refuerzo +2.</b> Reforzar suma +2 tropas en cualquier territorio propio, gratis en monedas y por 1 acción.</li>
-        <li><b>Orden extra.</b> La Tienda vende +1 acción por ¤5, máximo una vez por ronda.</li>
-        <li><b>Amenazas visibles.</b> Tus sectores atacables por el rival quedan marcados en rojo punteado.</li>
-        <li><b>Parte rival al volver.</b> Al empezar tu ronda se abre el último parte del rival para que puedas reconstruir qué cambió.</li>
-        <li><b>Tutorial de 15 pasos.</b> Enseña el juego de punta a punta, incluido el NEXO, PLAN y REPLANTEAR.</li>
+        <li><b>Tienda a mano.</b> Sale del menú y queda junto a la selección, con el saldo siempre visible.</li>
+        <li><b>Resumen rival automático.</b> Al volver a tu turno aparece sobre el mapa y se mantiene hasta que lo leas o descartes.</li>
+        <li><b>Resumen navegable.</b> Tocá un movimiento enemigo para centrar el sector; RIVAL conserva el historial completo.</li>
+        <li><b>Tienda contextual.</b> Indica si el sector elegido se puede fortificar y cuánto cuesta.</li>
+        <li><b>Correcciones.</b> Refuerzo muestra +2 desde el primer render y la Orden extra pasa a mostrar 7/7 acciones.</li>
       </ol>
     </div>
     <button id="tutorialFromHelpBtn" class="secondary-btn">ABRIR TUTORIAL COMPLETO</button>
@@ -110,8 +120,8 @@
       <p><b>Mover.</b> Entre vecinos propios. Elegís la cantidad y siempre queda al menos 1 tropa en origen. Todo el traslado cuesta 1 acción.</p>
       <p><b>Atacar.</b> Previsualización antes de tirar. 1d6 contra 1d6; empate favorece al defensor. El primer ataque bloquea REPLANTEAR para que no haya rerolls.</p>
       <p><b>REPLANTEAR.</b> Antes de atacar restaura tablero, dinero, acciones, hitos y fortificaciones al comienzo de la ronda. PLAN se conserva como anotación.</p>
-      <p><b>Tienda.</b> Fortificar cuesta ¤4 + 1 acción. Orden extra cuesta ¤5 y suma +1 acción una vez por ronda. Las tropas normales no cuestan monedas.</p>
-      <p><b>RIVAL.</b> Conserva el historial reciente y cada evento puede centrar el mapa en el sector afectado.</p>
+      <p><b>Tienda.</b> Está siempre junto a la selección. Fortificar cuesta ¤4 + 1 acción; Orden extra cuesta ¤5 y suma +1 acción una vez por ronda. Las tropas normales no cuestan monedas.</p>
+      <p><b>RIVAL.</b> Al volver a tu turno aparece un resumen automático sobre el mapa. El botón RIVAL conserva el historial reciente y cada evento puede centrar el sector afectado.</p>
       <p><b>Cerrar.</b> TERMINAR TURNO siempre pide confirmación. Si te quedan acciones, no pasa nada: podés seguir pensando sin límite.</p>
     </div>
   </dialog>
@@ -157,9 +167,11 @@
   </div>
 
   <dialog id="storeDialog">
-    <div class="dialog-head"><div><small>OPCIONES SECUNDARIAS</small><h2>Tienda</h2></div><button data-close="store" aria-label="Cerrar tienda">×</button></div>
+    <div class="dialog-head"><div><small>ECONOMÍA DEL TURNO</small><h2>Tienda</h2></div><button data-close="store" aria-label="Cerrar tienda">×</button></div>
+    <div class="store-balance"><span>Fondos disponibles</span><b id="storeBalance">¤12</b></div>
+    <p id="storeContext" class="dialog-copy">Seleccioná un territorio propio para evaluar una fortificación.</p>
     <p class="dialog-copy">Las tropas normales son gratis. Las monedas sirven para decisiones especiales, no para habilitar el juego básico.</p>
-    <button id="storeFortifyBtn" class="secondary-btn">Fortificar sector seleccionado · ¤4 + 1 acción</button>
+    <button id="storeFortifyBtn" class="secondary-btn">Fortificar · seleccioná un sector propio</button>
     <button id="storeExtraBtn" class="secondary-btn">Orden extra · +1 acción · ¤5</button>
   </dialog>
 
@@ -181,6 +193,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=0.7.0"></script>
+  <script type="module" src="./app.js?v=0.8.0"></script>
 </body>
 </html>
