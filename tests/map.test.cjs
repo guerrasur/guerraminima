@@ -225,3 +225,58 @@ test('closing a turn clears planning and stores a navigable rival report',()=>{
   assert.equal(run('state.lastRivalReport.every(x=>typeof x.text==="string")'),true);
   assert.equal(run('state.ap'),6);
 });
+
+
+test('v0.6 relaxed turn keeps planning free and starts with six actions',()=>{
+  const {run}=setup();
+  assert.equal(run('MAX_AP'),6);
+  assert.equal(run('state.ap'),6);
+  run('selected=state.playerCapital;togglePlan()');
+  assert.equal(run('state.plans.length'),1);
+  assert.equal(run('state.ap'),6);
+  run('togglePlan()');
+  assert.equal(run('state.plans.length'),0);
+});
+
+test('headquarters reinforcement gives two troops for one action and no coins',()=>{
+  const {run}=setup();
+  run('selected=state.playerCapital');
+  const before=run('({troops:state.cells[selected].troops,ap:state.ap,money:state.resources.money})');
+  run('act("reinforce")');
+  assert.equal(run('state.cells[selected].troops'),before.troops+2);
+  assert.equal(run('state.ap'),before.ap-1);
+  assert.equal(run('state.resources.money'),before.money);
+});
+
+test('movement preview can transfer several troops for one action',()=>{
+  const {run}=setup();
+  const data=run('(()=>{const source=state.playerCapital,target=neighbors(source).find(i=>state.cells[i].owner==="p");selected=source;return {source,target,from:state.cells[source].troops,to:state.cells[target].troops,ap:state.ap}})()');
+  run('beginMove()');
+  assert.equal(run(`finishMove(${data.target})`),true);
+  run('el("moveAmount").value="3";confirmMove()');
+  assert.equal(run(`state.cells[${data.source}].troops`),data.from-3);
+  assert.equal(run(`state.cells[${data.target}].troops`),data.to+3);
+  assert.equal(run('state.ap'),data.ap-1);
+});
+
+test('attack preview does not spend an action until confirmed',()=>{
+  const {run}=setup();
+  const target=run('neighbors(state.playerCapital)[0]');
+  run(`state.cells[${target}].owner="ai";state.cells[${target}].troops=2;selected=${target}`);
+  const before=run('state.ap');
+  run('requestAttack()');
+  assert.equal(run('state.ap'),before);
+  assert.equal(run('pendingAttack.target'),target);
+  run('confirmAttack()');
+  assert.equal(run('state.ap'),before-1);
+});
+
+test('ending turn clears planning and records rival actions for later review',()=>{
+  const {run}=setup();
+  run('selected=state.playerCapital;togglePlan();endTurn()');
+  assert.equal(run('state.plans.length'),0);
+  assert.equal(run('state.ap'),6);
+  assert.equal(run('Array.isArray(state.lastRivalReport)'),true);
+  assert.equal(run('state.lastRivalReport.every(x=>typeof x.text==="string")'),true);
+  assert.ok(run('state.turnHistory.length')>=1);
+});
