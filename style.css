@@ -221,3 +221,16 @@ h3 { font-size:12px; color:#bbed3d; margin-top:20px; }
   .turn-pill { min-width:82px; }
   .turn-pill small { font-size:6px; }
 }
+
+
+/* v0.6.0 move/attack previews */
+.move-picker { display:grid; gap:8px; margin:14px 0 8px; }
+.move-picker strong { color:#62e8ff; font:900 15px system-ui,sans-serif; }
+.move-picker input { width:100%; accent-color:#62e8ff; }
+.preview-copy {
+  margin:10px 0 0; padding:10px; border:1px solid #6b6e5d; border-radius:6px;
+  background:#151d10; color:#fffbea; font:700 11px/1.45 system-ui,sans-serif;
+}
+.report-turn { display:grid; gap:6px; padding-top:10px; border-top:1px solid #454839; }
+.report-turn:first-child { border-top:0; padding-top:0; }
+.report-turn > small { color:#62e8ff; font:900 8px system-ui,sans-serif; letter-spacing:.14em; }
