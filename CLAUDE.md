@@ -44,3 +44,17 @@ No agregar todavía:
 - ventajas por país.
 
 Primero validar navegación del mapa, lectura territorial y decisiones de turno.
+
+
+## Regla de documentación para IA
+
+Cada vez que se agregue o modifique una mecánica, acción, recurso, control, límite o sistema visible para el jugador:
+
+- actualizar la guía/changelog dentro del juego en `index.html`;
+- explicar en lenguaje simple qué hace, cuánto cuesta, cuándo se puede usar y qué límite tiene;
+- incluir el cambio bajo la versión correspondiente;
+- hacer que la guía se muestre automáticamente una vez al abrir esa versión nueva;
+- mantener accesible la guía desde el menú;
+- no introducir mecánicas que dependan de reglas ocultas sin una señal visual o explicación en la interfaz.
+
+Esta documentación forma parte de la funcionalidad, no es opcional. Una feature nueva no se considera terminada hasta que su explicación para el jugador también esté actualizada.
