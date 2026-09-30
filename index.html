@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#25342a" />
+  <meta name="description" content="Guerra Mínima — prototipo de estrategia asíncrona." />
+  <title>Guerra Mínima</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./style.css?v=0.1.0" />
+</head>
+<body>
+  <main id="app">
+    <header class="hud">
+      <div class="title-row">
+        <div>
+          <h1>GUERRA MÍNIMA</h1>
+          <p id="warName">Generando conflicto…</p>
+        </div>
+        <button id="menuBtn" class="icon-btn" aria-label="Opciones">☰</button>
+      </div>
+
+      <div class="versus">
+        <div class="country player-country">
+          <span id="playerFlag" class="flag">🏳️</span>
+          <div><strong id="playerCountry">—</strong><small>VOS</small></div>
+        </div>
+        <div class="turn-pill"><span id="dayLabel">Día 1</span><b id="apLabel">3/3</b><small>acciones</small></div>
+        <div class="country enemy-country">
+          <div><strong id="enemyCountry">—</strong><small>RIVAL</small></div>
+          <span id="enemyFlag" class="flag">🏳️</span>
+        </div>
+      </div>
+
+      <div id="resources" class="resources"></div>
+    </header>
+
+    <section id="mapShell" class="map-shell" aria-label="Mapa de la partida">
+      <canvas id="world"></canvas>
+      <div class="map-hint" id="mapHint">Arrastrá para recorrer el continente · Tocá una zona para seleccionarla</div>
+      <button id="centerBtn" class="center-btn">⌖</button>
+      <div id="toast" class="toast" aria-live="polite"></div>
+    </section>
+
+    <section id="selection" class="selection">
+      <div>
+        <small>SELECCIÓN</small>
+        <strong id="selectionTitle">Tocá una zona del mapa</strong>
+        <span id="selectionMeta">El mundo sigue vivo mientras decidís.</span>
+      </div>
+      <button id="marketBtn" class="market-btn">Mercado</button>
+    </section>
+
+    <nav class="actions" aria-label="Acciones del turno">
+      <button data-action="expand"><span>⚑</span>Expandir</button>
+      <button data-action="build"><span>⌂</span>Construir</button>
+      <button data-action="harvest"><span>✦</span>Desarrollar</button>
+      <button data-action="explore"><span>◇</span>Ruinas</button>
+      <button data-action="attack"><span>⚔</span>Intervenir</button>
+    </nav>
+
+    <footer class="turn-footer">
+      <div id="lastEvent">Elegí hasta 3 acciones.</div>
+      <button id="endTurnBtn">TERMINAR TURNO</button>
+    </footer>
+  </main>
+
+  <dialog id="marketDialog">
+    <div class="dialog-head">
+      <div><small>MERCADO DEL CONTINENTE</small><h2>Comprar / vender</h2></div>
+      <button data-close="market">×</button>
+    </div>
+    <p class="dialog-copy">Las operaciones no gastan acciones. Máximo 3 por turno.</p>
+    <div id="marketRows"></div>
+    <div class="trade-count" id="tradeCount">0 / 3 operaciones</div>
+  </dialog>
+
+  <dialog id="menuDialog">
+    <div class="dialog-head">
+      <div><small>DEMO LOCAL</small><h2>Partida</h2></div>
+      <button data-close="menu">×</button>
+    </div>
+    <button id="newGameBtn" class="danger-btn">Generar un continente nuevo</button>
+    <p class="dialog-copy">La partida se guarda automáticamente en este dispositivo. El rival de esta versión es automático.</p>
+    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.1.0</b></div>
+  </dialog>
+
+  <div id="updateOverlay" class="update-overlay" hidden>
+    <div class="update-card">
+      <small>NUEVA VERSIÓN</small>
+      <h2>Guerra Mínima se actualizó.</h2>
+      <p>Tu partida local se conserva. Recargá para usar la versión nueva.</p>
+      <button id="updateBtn">ACTUALIZAR</button>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js?v=0.1.0"></script>
+</body>
+</html>
