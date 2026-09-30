@@ -1,10 +1,11 @@
-const VERSION = "0.5.0";
+const VERSION = "0.6.0";
 const SAVE_KEY = "guerra-minima-save-v1";
 const W = 40;
 const H = 28;
 const TW = 48;
 const TH = 24;
-const MAX_AP = 3;
+const MAX_AP = 6;
+const MAX_PLANS = 5;
 const TERRITORY_WIN = 0.60;
 const START_MONEY = 12;
 const CAPITAL_TROOPS = 6;
@@ -190,8 +191,11 @@ function newState() {
     aiResources:{ money:START_MONEY },
     winner:null,
     victoryReason:null,
-    log:["Avanzá hacia los puestos ★. Mantené 2 durante 3 rondas para ganar."],
-    milestones:{p:[],ai:[]}
+    log:["Tenés tiempo. Leé el mapa, armá tu plan y cerrá el turno cuando quieras."],
+    milestones:{p:[],ai:[]},
+    plans:[],
+    lastRivalReport:[],
+    turnHistory:[]
   };
   for (const i of POSTS) fresh.cells[i].building = "outpost";
   return fresh;
@@ -216,6 +220,9 @@ function load() {
     state.aiResources = { money:Number.isFinite(oldAiMoney) ? oldAiMoney : START_MONEY };
     state.winner = state.winner || null;
     state.victoryReason = state.victoryReason || null;
+    state.plans = Array.isArray(state.plans) ? state.plans.filter(Number.isInteger).slice(0,MAX_PLANS) : [];
+    state.lastRivalReport = Array.isArray(state.lastRivalReport) ? state.lastRivalReport : [];
+    state.turnHistory = Array.isArray(state.turnHistory) ? state.turnHistory.slice(-12) : [];
     state.cells.forEach((c,i) => {
       c.ruin = false;
       c.explored = false;
@@ -284,7 +291,7 @@ function syncUI() {
   el("dayLabel").textContent = "Día " + state.day + " · T" + state.turn;
   el("apLabel").textContent = state.ap + "/" + MAX_AP;
   el("versionLabel").textContent = "v" + VERSION;
-  el("lastEvent").textContent = state.log[0] || "Elegí hasta 3 acciones.";
+  el("lastEvent").textContent = state.log[0] || "Sin reloj: revisá el mapa y cerrá el turno cuando quieras.";
 
   const pct = Math.round(territoryShare("p") * 100);
   el("resources").innerHTML =
@@ -295,7 +302,15 @@ function syncUI() {
   const threats = state.cells.filter((c,i) => c.owner === "p" && strongestAdjacent(i,"ai") != null).length;
   el("threatLabel").textContent = threats ? "⚠ " + threats + " sectores bajo amenaza" : "Sin ataques posibles del rival en tu frontera";
   el("threatLabel").classList[threats ? "add" : "remove"]("danger");
+  const reportBtn = el("reportBtn");
+  if (reportBtn) reportBtn.textContent = state.lastRivalReport.length ? "☷ RIVAL · " + state.lastRivalReport.length : "☷ RIVAL";
+  refreshReportUI();
   updateSelectionUI();
+}
+
+function sectorLabel(i) {
+  const p = xy(i);
+  return "sector " + (p.x+1) + "." + (p.y+1);
 }
 
 function ownerLabel(owner) {
@@ -338,6 +353,13 @@ function updateSelectionUI() {
   document.querySelectorAll(".actions button").forEach((button) => {
     button.disabled = !canAction(button.dataset.action);
   });
+  const planBtn = el("planBtn");
+  if (planBtn) {
+    planBtn.disabled = selected == null || !isLand(selected);
+    planBtn.textContent = selected != null && state.plans.includes(selected) ? "✓ PLAN" : "＋ PLAN";
+  }
+  const clearPlanBtn = el("clearPlanBtn");
+  if (clearPlanBtn) clearPlanBtn.disabled = !state.plans.length;
   const storeFortify = el("storeFortifyBtn");
   if (storeFortify) storeFortify.disabled = !canAction("fortify");
 }
@@ -357,6 +379,55 @@ function addLog(text) {
   state.log.unshift(text);
   state.log = state.log.slice(0,8);
   el("lastEvent").textContent = text;
+}
+
+function togglePlan() {
+  if (selected == null || !isLand(selected)) {
+    toast("Seleccioná primero un territorio del mapa.");
+    return;
+  }
+  const pos = state.plans.indexOf(selected);
+  if (pos >= 0) {
+    state.plans.splice(pos,1);
+    toast("Marca de planificación quitada.");
+  } else {
+    if (state.plans.length >= MAX_PLANS) {
+      toast("Podés marcar hasta " + MAX_PLANS + " sectores por turno.");
+      return;
+    }
+    state.plans.push(selected);
+    toast("Plan " + state.plans.length + " marcado en " + sectorLabel(selected) + ".");
+  }
+  save();
+  syncUI();
+}
+
+function clearPlans() {
+  state.plans = [];
+  save();
+  syncUI();
+  toast("Planificación limpiada.");
+}
+
+function refreshReportUI() {
+  const body = el("reportBody");
+  if (!body || !state) return;
+  if (!state.lastRivalReport.length) {
+    body.innerHTML = '<p class="empty-report">Todavía no hay un turno rival para revisar.</p>';
+    return;
+  }
+  body.innerHTML = state.lastRivalReport.map((line,i) =>
+    '<button class="report-event" data-report-index="'+i+'"><b>'+(i+1)+'.</b> '+line.text+'</button>'
+  ).join("");
+  body.querySelectorAll(".report-event").forEach((button) => button.addEventListener("click",() => {
+    const item = state.lastRivalReport[Number(button.dataset.reportIndex)];
+    if (item && Number.isInteger(item.tile)) {
+      selected = item.tile;
+      centerOnTile(item.tile);
+      updateSelectionUI();
+      closeDialog("report");
+    }
+  }));
 }
 
 function useAction() {
@@ -538,6 +609,7 @@ function aiMoveTowardPlayer() {
 
 function aiTurn() {
   const note = [];
+  const record = (text,tile=null) => note.push({text,tile});
   for (let move=0; move<MAX_AP && !state.winner; move++) {
     const attackables = [];
     const expandables = [];
@@ -554,7 +626,7 @@ function aiTurn() {
     if (attackables.length && (attackables[0] === state.playerCapital || Math.random() < .55)) {
       const i = attackables[0];
       const result = resolveCombat("ai",i);
-      if (result) note.push("atacó: " + result.message);
+      if (result) record("Atacó " + sectorLabel(i) + ": " + result.message + ".", i);
       checkVictory();
       continue;
     }
@@ -568,7 +640,7 @@ function aiTurn() {
       state.cells[source].troops -= 1;
       state.cells[i].owner = "ai";
       state.cells[i].troops = 1;
-      note.push("expandió su frontera");
+      record("Expandió su frontera hacia " + sectorLabel(i) + ".", i);
       checkVictory();
       continue;
     }
@@ -576,7 +648,7 @@ function aiTurn() {
     const exposedPost = reinforceables.find(i => (POSTS.includes(i) || i === state.enemyCapital) && !state.cells[i].fort && adjacentOwner(i,"p"));
     if (exposedPost != null && state.aiResources.money >= FORT_COST) {
       state.cells[exposedPost].fort = true; state.aiResources.money -= FORT_COST;
-      note.push("fortificó un objetivo"); continue;
+      record("Fortificó " + sectorLabel(exposedPost) + ".", exposedPost); continue;
     }
     if (reinforceables.length) {
       const frontier = reinforceables.filter((i) => neighbors(i).some((n) => state.cells[n].owner !== "ai" && isLand(n)));
@@ -586,21 +658,35 @@ function aiTurn() {
       pool.sort((a,b) => score(a)-score(b));
       const i = pool[0];
       state.cells[i].troops += 1;
-      note.push("reforzó su frontera");
+      record("Reforzó " + sectorLabel(i) + ".", i);
       continue;
     }
 
-    if (aiMoveTowardPlayer()) note.push("movió tropas hacia vos");
-    else note.push("consolidó posiciones");
+    if (aiMoveTowardPlayer()) record("Movió tropas hacia tu frente.");
+    else record("Consolidó posiciones.");
   }
   return note;
+}
+
+function requestEndTurn() {
+  if (state.winner) return showVictory();
+  const copy = el("endTurnCopy");
+  const used = MAX_AP - state.ap;
+  const planCount = state.plans.length;
+  copy.textContent = "Usaste " + used + " de " + MAX_AP + " acciones. " +
+    (state.ap ? "Te quedan " + state.ap + ". " : "") +
+    (planCount ? "Tenés " + planCount + " marcas de planificación activas. " : "") +
+    "No hay reloj: cerrá solamente cuando estés conforme.";
+  el("endTurnDialog").showModal();
 }
 
 function endTurn() {
   if (state.winner) return showVictory();
   moveSource = null;
+  state.plans = [];
   grantIncome("ai");
   const note = aiTurn();
+  state.lastRivalReport = note;
   if (state.winner) {
     save();
     syncUI();
@@ -610,11 +696,13 @@ function endTurn() {
   state.day++;
   state.ap = MAX_AP;
   const playerIncome = grantIncome("p");
-  const summary = note.length ? "Rival: " + note.slice(0,3).join(" · ") + "." : "Rival: consolidó su territorio.";
-  addLog(summary + " Vos recibís ¤" + playerIncome + " por tus territorios.");
+  const compact = note.length ? note.slice(0,2).map(x=>x.text).join(" · ") : "Consolidó su territorio.";
+  state.turnHistory.push({turn:state.turn-1, rival:note, income:playerIncome});
+  state.turnHistory = state.turnHistory.slice(-12);
+  addLog("Rival: " + compact + " Vos recibís ¤" + playerIncome + ".");
   save();
   syncUI();
-  toast("Es tu turno. Ingreso: ¤" + playerIncome + ".");
+  toast("Tu turno. Sin reloj · ingreso ¤" + playerIncome + ".");
 }
 
 function terrainColor(t, x, y) {
@@ -814,6 +902,21 @@ function render(time=0) {
           outlineDiamond(p,"#ff695b",Math.max(1.3,2*zoom),true);
         }
 
+        if (state.plans.includes(i)) {
+          outlineDiamond(p,"#62e8ff",Math.max(2,2.6*zoom),true);
+          ctx.save();
+          ctx.fillStyle="#0b0c09";
+          ctx.strokeStyle="#62e8ff";
+          ctx.lineWidth=Math.max(1,1.3*zoom);
+          ctx.beginPath();
+          ctx.arc(p.x-11*zoom,p.y+9*zoom,Math.max(6,7*zoom),0,Math.PI*2);
+          ctx.fill(); ctx.stroke();
+          ctx.fillStyle="#62e8ff";
+          ctx.font=`900 ${Math.max(8,9*zoom)}px system-ui,sans-serif`;
+          ctx.textAlign="center"; ctx.textBaseline="middle";
+          ctx.fillText(String(state.plans.indexOf(i)+1),p.x-11*zoom,p.y+9*zoom+.5);
+          ctx.restore();
+        }
         if (selected === i) outlineDiamond(p,"#ffffff",Math.max(2,2.8*zoom));
         continue;
         }
@@ -950,8 +1053,53 @@ function toast(text) {
 }
 
 function closeDialog(which) {
-  const d = which === "help" ? el("helpDialog") : which === "victory" ? el("victoryDialog") : which === "store" ? el("storeDialog") : el("menuDialog");
-  if (d.open) d.close();
+  const ids = {
+    help:"helpDialog", victory:"victoryDialog", store:"storeDialog", menu:"menuDialog",
+    report:"reportDialog", endturn:"endTurnDialog"
+  };
+  const d = el(ids[which] || "menuDialog");
+  if (d && d.open) d.close();
+}
+
+const TUTORIAL_STEPS = [
+  {title:"1 · El objetivo", target:"#enemyCountry", text:"Tu meta principal es abrirte camino y tomar el cuartel rival. El territorio, los puestos y la economía existen para ayudarte a llegar mejor preparado."},
+  {title:"2 · Leé el mapa", target:"#mapShell", text:"Antes de tocar nada, recorré el continente. Número = tropas. + es tu territorio; × es rival. Blanco punteado se puede expandir; rojo punteado se puede atacar."},
+  {title:"3 · Seleccioná y compará", target:"#selection", text:"Tocá cualquier sector para ver dueño, tropas, terreno, fortificación y si es atacable. Mirar, hacer zoom y mover la cámara nunca gasta acciones."},
+  {title:"4 · Expandir", target:'[data-action="expand"]', text:"Seleccioná un neutral junto a tus tierras. Un vecino propio necesita al menos 2 tropas: una pasa al territorio nuevo. Expandir gasta 1 acción."},
+  {title:"5 · Reforzar", target:'[data-action="reinforce"]', text:"En un territorio propio, Reforzar suma +1 tropa gratis. Cuesta 1 acción, no monedas. Elegí dónde concentrar fuerza."},
+  {title:"6 · Mover", target:'[data-action="move"]', text:"Elegí un territorio propio con 2+ tropas, tocá Mover y después un vecino propio. Siempre queda al menos 1 tropa atrás. Gasta 1 acción."},
+  {title:"7 · Atacar", target:'[data-action="attack"]', text:"Seleccioná un territorio rival adyacente. El ataque sale desde tu vecino con más tropas. El combate usa 1d6 por lado; empate favorece al defensor."},
+  {title:"8 · Economía y tienda", target:"#storeBtn", text:"Las monedas llegan por territorio y por hitos. No compran tropas normales: sirven para decisiones especiales como fortificar un sector."},
+  {title:"9 · Pensá el turno", target:"#planBtn", text:"PLAN es gratis: marcá hasta 5 sectores con números para recordar un orden, una amenaza o un objetivo. Las marcas desaparecen al cerrar el turno."},
+  {title:"10 · Revisá al rival", target:"#reportBtn", text:"Después del turno rival, RIVAL guarda cada movimiento importante. Tocá un evento y el mapa te lleva a ese sector. Sirve especialmente si retomás la partida más tarde."},
+  {title:"11 · Cerrá cuando quieras", target:"#endTurnBtn", text:"Tenés 6 acciones, pero ningún reloj. Podés pasar varios minutos mirando y pensando. Terminá el turno sólo cuando estés conforme; el juego te pide confirmación."},
+  {title:"12 · Cómo ganar", target:"#mapShell", text:"Protegé tu cuartel, construí un frente, usá puestos y fortificaciones cuando convenga y buscá el cuartel enemigo. El tutorial termina acá: el ritmo lo ponés vos."}
+];
+let tutorialStep = 0;
+
+function paintTutorialStep() {
+  document.querySelectorAll(".tutorial-focus").forEach(n=>n.classList.remove("tutorial-focus"));
+  const step = TUTORIAL_STEPS[tutorialStep];
+  el("tutorialTitle").textContent = step.title;
+  el("tutorialText").textContent = step.text;
+  el("tutorialCounter").textContent = (tutorialStep+1) + "/" + TUTORIAL_STEPS.length;
+  el("tutorialPrev").disabled = tutorialStep === 0;
+  el("tutorialNext").textContent = tutorialStep === TUTORIAL_STEPS.length-1 ? "TERMINAR" : "SIGUIENTE";
+  const target = document.querySelector(step.target);
+  if (target) target.classList.add("tutorial-focus");
+}
+
+function startTutorial() {
+  ["menuDialog","helpDialog","storeDialog","reportDialog"].forEach(id=>{const d=el(id); if(d?.open)d.close();});
+  tutorialStep = 0;
+  el("tutorialPanel").hidden = false;
+  paintTutorialStep();
+}
+
+function stopTutorial() {
+  el("tutorialPanel").hidden = true;
+  document.querySelectorAll(".tutorial-focus").forEach(n=>n.classList.remove("tutorial-focus"));
+  localStorage.setItem("guerra-minima-tutorial-version",VERSION);
 }
 
 function bindEvents() {
@@ -1019,9 +1167,21 @@ function bindEvents() {
   });
   el("storeBtn").addEventListener("click",() => { closeDialog("menu"); el("storeDialog").showModal(); });
   el("storeFortifyBtn").addEventListener("click",() => { closeDialog("store"); act("fortify"); });
-  el("endTurnBtn").addEventListener("click",endTurn);
+  el("planBtn").addEventListener("click",togglePlan);
+  el("clearPlanBtn").addEventListener("click",clearPlans);
+  el("reportBtn").addEventListener("click",() => { refreshReportUI(); el("reportDialog").showModal(); });
+  el("endTurnBtn").addEventListener("click",requestEndTurn);
+  el("confirmEndTurnBtn").addEventListener("click",() => { closeDialog("endturn"); endTurn(); });
   el("menuBtn").addEventListener("click",() => el("menuDialog").showModal());
   el("helpBtn").addEventListener("click",() => { closeDialog("menu"); el("helpDialog").showModal(); });
+  el("tutorialBtn").addEventListener("click",startTutorial);
+  el("tutorialFromHelpBtn").addEventListener("click",startTutorial);
+  el("tutorialPrev").addEventListener("click",() => { if(tutorialStep>0){tutorialStep--;paintTutorialStep();} });
+  el("tutorialNext").addEventListener("click",() => {
+    if (tutorialStep >= TUTORIAL_STEPS.length-1) stopTutorial();
+    else { tutorialStep++; paintTutorialStep(); }
+  });
+  el("tutorialClose").addEventListener("click",stopTutorial);
   el("zoomInBtn").addEventListener("click",() => setZoom(zoom+0.15));
   el("zoomOutBtn").addEventListener("click",() => setZoom(zoom-0.15));
   el("centerBtn").addEventListener("click",centerOnPlayer);
@@ -1070,11 +1230,8 @@ async function boot() {
   requestAnimationFrame(render);
   if (state.winner) showVictory();
 
-  const guideKey = "guerra-minima-guide-version";
-  if (localStorage.getItem(guideKey) !== VERSION) {
-    localStorage.setItem(guideKey,VERSION);
-    el("helpDialog").showModal();
-  }
+  const tutorialKey = "guerra-minima-tutorial-version";
+  if (localStorage.getItem(tutorialKey) !== VERSION) startTutorial();
 
   checkVersion();
   setInterval(checkVersion,60000);
