@@ -119,3 +119,47 @@ test('capturing the enemy headquarters is a victory condition',()=>{
   const {run}=setup();
   assert.equal(run(`(()=>{state.cells[state.enemyCapital].owner='p';checkVictory();return state.winner==='p'&&state.victoryReason.includes('cuartel rival')})()`),true);
 });
+
+test('new game starts with the simplified economy and defended HQs',()=>{
+  const {run}=setup();
+  assert.equal(run('Object.keys(state.resources).join(",")'),'money');
+  assert.equal(run('state.cells[state.playerCapital].building'),'capital');
+  assert.equal(run('state.cells[state.enemyCapital].building'),'capital');
+  assert.equal(run('state.cells[state.playerCapital].troops'),6);
+  assert.equal(run('state.cells[state.enemyCapital].troops'),6);
+  assert.equal(run('state.cells.every(c=>!c.owner||c.troops>=1)'),true);
+  assert.equal(run('state.cells.some(c=>c.ruin)'),false);
+});
+
+test('reinforce spends one action and two coins for one troop',()=>{
+  const {run}=setup();
+  run('selected=state.playerCapital');
+  const before=run('({money:state.resources.money,troops:state.cells[selected].troops,ap:state.ap})');
+  run('act("reinforce")');
+  assert.equal(run('state.resources.money'),before.money-2);
+  assert.equal(run('state.cells[selected].troops'),before.troops+1);
+  assert.equal(run('state.ap'),before.ap-1);
+});
+
+test('expansion transfers one troop and movement never leaves a territory empty',()=>{
+  const {run}=setup();
+  const setupExpansion=run(`(()=>{
+    for(let i=0;i<state.cells.length;i++) if(isLand(i)&&state.cells[i].owner===null){
+      const source=neighbors(i).find(n=>state.cells[n].owner==="p");
+      if(source!=null){state.cells[source].troops=2; selected=i; return {target:i,source};}
+    }
+    return null;
+  })()`);
+  assert.ok(setupExpansion);
+  run('act("expand")');
+  assert.equal(run(`state.cells[${setupExpansion.target}].owner`),'p');
+  assert.equal(run(`state.cells[${setupExpansion.target}].troops`),1);
+  assert.equal(run(`state.cells[${setupExpansion.source}].troops`),1);
+});
+
+test('capturing the enemy HQ ends the match immediately',()=>{
+  const {run}=setup();
+  run('state.cells[state.enemyCapital].owner="p"; state.cells[state.enemyCapital].troops=1; checkVictory()');
+  assert.equal(run('state.winner'),'p');
+  assert.equal(run('state.victoryReason'),'tomaste el cuartel rival');
+});
