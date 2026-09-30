@@ -1,5 +1,5 @@
-const CACHE = "guerra-minima-v0.1.1";
-const CORE = ["./", "./index.html", "./style.css?v=0.1.1", "./app.js?v=0.1.1", "./manifest.webmanifest"];
+const CACHE = "guerra-minima-v0.1.2";
+const CORE = ["./", "./index.html", "./style.css?v=0.1.2", "./app.js?v=0.1.2", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -8,7 +8,7 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+    caches.keys().then((keys) => Promise.all(keys.filter((key) => key.startsWith("guerra-minima-") && key !== CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });

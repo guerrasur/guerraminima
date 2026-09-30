@@ -52,3 +52,12 @@ No borrar ni renombrar \`guerra-minima-save-v1\` salvo que exista una migración
 ## Regla de documentación de mecánicas
 
 Toda mecánica o control nuevo debe documentarse también dentro de la guía/changelog del juego. La explicación debe indicar qué hace, coste, alcance o límite y condiciones de uso. La guía debe seguir disponible desde el menú y mostrarse una vez al entrar a cada versión nueva.
+
+
+## v0.1.2 — mapa y controles
+
+Se conservan las proporciones isométricas de v0.1.0. El lienzo ya no altera el tamaño de la grilla y se sincroniza con el espacio disponible, también al girar el teléfono. El terreno se dibuja antes de los objetos; tocar un edificio selecciona su sector.
+
+El arrastre sigue al dedo sin interpolación y el zoom conserva el punto del mapa entre ambos dedos. Soltar un dedo permite continuar arrastrando sin saltos; cancelar un gesto no selecciona. La rueda del mouse también permite hacer zoom. Una nueva partida vuelve a la capital. La limpieza de caché se limita a Guerra Mínima, sin borrar cachés de otros juegos del mismo dominio.
+
+Pruebas de regresión sin dependencias: `node --test tests/map.test.cjs`.

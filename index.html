@@ -7,7 +7,7 @@
   <meta name="description" content="Guerra Mínima — prototipo de estrategia asíncrona." />
   <title>Guerra Mínima</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./style.css?v=0.1.1" />
+  <link rel="stylesheet" href="./style.css?v=0.1.2" />
 </head>
 <body>
   <main id="app">
@@ -87,12 +87,12 @@
     <button id="helpBtn" class="secondary-btn">Ver reglas y cambios</button>
     <button id="newGameBtn" class="danger-btn">Generar un continente nuevo</button>
     <p class="dialog-copy">La partida se guarda automáticamente en este dispositivo. El rival de esta versión es automático.</p>
-    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.1.1</b></div>
+    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.1.2</b></div>
   </dialog>
 
   <dialog id="helpDialog">
     <div class="dialog-head">
-      <div><small>GUÍA · v0.1.1</small><h2>Qué podés hacer</h2></div>
+      <div><small>GUÍA · v0.1.2</small><h2>Qué podés hacer</h2></div>
       <button data-close="help">×</button>
     </div>
     <div class="help-block">
@@ -103,11 +103,11 @@
       <p><b>Explorar</b> — solo en ruinas sin explorar. Te da dinero y materiales; si la ruina es neutral pero toca tu frontera, también pasa a tu control.</p>
       <p><b>Intervenir</b> — cuesta 3 comida y 1 metal. Solo contra una casilla rival pegada a tu frontera. Tiene una probabilidad de éxito.</p>
       <p><b>Alcance</b> — no podés saltar casillas. Tu territorio crece desde los bordes, una casilla por vez.</p>
-      <p><b>Zoom</b> — pellizcá con dos dedos o usá + / −. El botón ⌖ vuelve a tu capital.</p>
+      <p><b>Controles</b> — tocá una casilla o su edificio para seleccionarla. Arrastrá con un dedo para mover el mapa; con dos podés mover y hacer zoom a la vez. También podés usar la rueda del mouse o + / − (zoom de 55% a 180%). El botón ⌖ vuelve a tu capital. Mover y acercar el mapa no cuesta acciones ni recursos.</p>
     </div>
     <div class="changelog">
-      <small>NUEVO EN v0.1.1</small>
-      <p>Zoom táctil y botones +/−, alcance visible en el mapa, nombres de acciones más claros y esta guía inicial.</p>
+      <small>NUEVO EN v0.1.2</small>
+      <p>Vista isométrica corregida: los edificios ya no quedan tapados por el suelo. Toques precisos, arrastre sin rebote y zoom anclado entre tus dedos. Cancelar un gesto no selecciona casillas. El mapa se ajusta al girar el celular y una partida nueva empieza centrada en tu capital.</p>
     </div>
   </dialog>
 
@@ -120,6 +120,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=0.1.1"></script>
+  <script type="module" src="./app.js?v=0.1.2"></script>
 </body>
 </html>

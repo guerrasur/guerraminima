@@ -1,4 +1,4 @@
-const VERSION = "0.1.1";
+const VERSION = "0.1.2";
 const SAVE_KEY = "guerra-minima-save-v1";
 const W = 40;
 const H = 28;
@@ -44,13 +44,12 @@ let zoom = 1;
 const MIN_ZOOM = 0.55;
 const MAX_ZOOM = 1.8;
 const pointers = new Map();
-let pinchStartDistance = 0;
-let pinchStartZoom = 1;
+let pinchStart = null;
 let dragging = false;
 let moved = false;
 let pointerStart = null;
 let cameraStart = null;
-let lastFrame = 0;
+
 let toastTimer = null;
 
 function flag(code) {
@@ -208,8 +207,9 @@ function load() {
 function resetGame() {
   state = newState();
   selected = null;
-  camera = {x:0,y:-70};
+  resetGesture();
   zoom = 1;
+  centerOnPlayer();
   save();
   syncUI();
   closeDialog("menu");
@@ -557,7 +557,7 @@ function drawBuilding(x,y,type,owner,time,i) {
   if (type === "capital") {
     ctx.strokeStyle = "#3b3426"; ctx.lineWidth = 2*zoom;
     ctx.beginPath(); ctx.moveTo(x+10*zoom,y-2*zoom); ctx.lineTo(x+10*zoom,y-26*zoom); ctx.stroke();
-    ctx.font = Math.max(10,18*zoom) + "px system-ui";
+    ctx.font = (18*zoom) + "px system-ui";
     ctx.textAlign = "left";
     ctx.fillText(flag(owner === "p" ? state.playerCountry[1] : state.enemyCountry[1]),x+8*zoom,y-17*zoom);
   }
@@ -578,82 +578,141 @@ function drawAgents(x,y,owner,time,i) {
 }
 
 function render(time=0) {
-  if (time - lastFrame < 32) {
-    requestAnimationFrame(render);
-    return;
-  }
-  lastFrame = time;
   ctx.clearRect(0,0,viewW,viewH);
   ctx.fillStyle = "#78969b";
   ctx.fillRect(0,0,viewW,viewH);
 
-  for (let s=0; s<W+H-1; s++) {
-    for (let x=0; x<W; x++) {
-      const y = s-x;
-      if (y<0 || y>=H) continue;
-      const i = idx(x,y);
-      const p = iso(x,y);
-      if (p.x < -TW*zoom || p.x > viewW+TW*zoom || p.y < -50*zoom || p.y > viewH+60*zoom) continue;
-      const t = terrain[i];
-      diamond(p, terrainColor(t,x,y), t === "water" ? "rgba(255,255,255,.07)" : "rgba(63,69,48,.15)");
+  for (let layer=0; layer<2; layer++) {
+    for (let s=0; s<W+H-1; s++) {
+      for (let x=0; x<W; x++) {
+        const y = s-x;
+        if (y<0 || y>=H) continue;
+        const i = idx(x,y);
+        const p = iso(x,y);
+        if (p.x < -TW*zoom || p.x > viewW+TW*zoom || p.y < -50*zoom || p.y > viewH+60*zoom) continue;
+        const t = terrain[i];
+        const c = state.cells[i];
+        if (layer === 0) {
+        diamond(p, terrainColor(t,x,y), t === "water" ? "rgba(255,255,255,.07)" : "rgba(63,69,48,.15)");
 
-      const c = state.cells[i];
-      if (c.owner) {
-        ctx.fillStyle = c.owner === "p" ? "rgba(228,207,98,.17)" : "rgba(177,75,67,.17)";
-        const tw = TW*zoom, th = TH*zoom;
-        ctx.beginPath();
-        ctx.moveTo(p.x,p.y+2*zoom); ctx.lineTo(p.x+tw/2-2*zoom,p.y+th/2); ctx.lineTo(p.x,p.y+th-2*zoom); ctx.lineTo(p.x-tw/2+2*zoom,p.y+th/2); ctx.closePath(); ctx.fill();
-      }
+        if (c.owner) {
+          ctx.fillStyle = c.owner === "p" ? "rgba(228,207,98,.17)" : "rgba(177,75,67,.17)";
+          const tw = TW*zoom, th = TH*zoom;
+          ctx.beginPath();
+          ctx.moveTo(p.x,p.y+2*zoom); ctx.lineTo(p.x+tw/2-2*zoom,p.y+th/2); ctx.lineTo(p.x,p.y+th-2*zoom); ctx.lineTo(p.x-tw/2+2*zoom,p.y+th/2); ctx.closePath(); ctx.fill();
+        }
 
-      if (state.ap > 0 && isLand(i) && c.owner === null && adjacentOwner(i,"p")) {
-        outlineDiamond(p,"rgba(255,245,177,.95)",Math.max(1.5,2.2*zoom),true);
-      } else if (state.ap > 0 && c.owner === "ai" && c.building !== "capital" && adjacentOwner(i,"p")) {
-        outlineDiamond(p,"rgba(255,177,163,.9)",Math.max(1.3,2*zoom),true);
-      }
+        if (state.ap > 0 && isLand(i) && c.owner === null && adjacentOwner(i,"p")) {
+          outlineDiamond(p,"rgba(255,245,177,.95)",Math.max(1.5,2.2*zoom),true);
+        } else if (state.ap > 0 && c.owner === "ai" && c.building !== "capital" && adjacentOwner(i,"p")) {
+          outlineDiamond(p,"rgba(255,177,163,.9)",Math.max(1.3,2*zoom),true);
+        }
 
-      if (t === "forest") {
-        const n = hash(state.seed ^ 99,x,y);
-        drawTree(p.x-7*zoom,p.y+11*zoom,.85);
-        if (n>.35) drawTree(p.x+5*zoom,p.y+8*zoom,.7);
-      }
-      if (t === "hills") {
-        ctx.fillStyle = "#81765f";
-        ctx.beginPath(); ctx.moveTo(p.x-10*zoom,p.y+13*zoom); ctx.lineTo(p.x-2*zoom,p.y+2*zoom); ctx.lineTo(p.x+5*zoom,p.y+13*zoom); ctx.fill();
-        ctx.fillStyle = "#92866a";
-        ctx.beginPath(); ctx.moveTo(p.x,p.y+13*zoom); ctx.lineTo(p.x+8*zoom,p.y+5*zoom); ctx.lineTo(p.x+13*zoom,p.y+13*zoom); ctx.fill();
-      }
-      if (c.ruin) drawRuin(p.x,p.y+10*zoom,c.explored);
-      if (c.building) {
-        drawBuilding(p.x,p.y+11*zoom,c.building,c.owner,time,i);
-        drawAgents(p.x,p.y+14*zoom,c.owner,time,i);
-      }
+        if (selected === i) outlineDiamond(p,"#fff4bd",Math.max(2,2.8*zoom));
+        continue;
+        }
 
-      if (selected === i) {
-        outlineDiamond(p,"#fff4bd",Math.max(2,2.8*zoom),false);
+        if (t === "forest") {
+          const n = hash(state.seed ^ 99,x,y);
+          drawTree(p.x-7*zoom,p.y+11*zoom,.85);
+          if (n>.35) drawTree(p.x+5*zoom,p.y+8*zoom,.7);
+        }
+        if (t === "hills") {
+          ctx.fillStyle = "#81765f";
+          ctx.beginPath(); ctx.moveTo(p.x-10*zoom,p.y+13*zoom); ctx.lineTo(p.x-2*zoom,p.y+2*zoom); ctx.lineTo(p.x+5*zoom,p.y+13*zoom); ctx.fill();
+          ctx.fillStyle = "#92866a";
+          ctx.beginPath(); ctx.moveTo(p.x,p.y+13*zoom); ctx.lineTo(p.x+8*zoom,p.y+5*zoom); ctx.lineTo(p.x+13*zoom,p.y+13*zoom); ctx.fill();
+        }
+        if (c.ruin) drawRuin(p.x,p.y+10*zoom,c.explored);
+        if (c.building) {
+          drawBuilding(p.x,p.y+11*zoom,c.building,c.owner,time,i);
+          drawAgents(p.x,p.y+14*zoom,c.owner,time,i);
+        }
+
+
       }
     }
-  }
 
+  }
   requestAnimationFrame(render);
 }
 
 function resize() {
   const rect = canvas.getBoundingClientRect();
-  viewW = Math.max(1,rect.width);
-  viewH = Math.max(1,rect.height);
-  dpr = Math.min(2,window.devicePixelRatio || 1);
-  canvas.width = Math.floor(viewW*dpr);
-  canvas.height = Math.floor(viewH*dpr);
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const nextW = Math.max(1,rect.width);
+  const nextH = Math.max(1,rect.height);
+  const nextDpr = Math.min(2,window.devicePixelRatio || 1);
+  if (viewW === nextW && viewH === nextH && dpr === nextDpr) return;
+  if (viewH > 1) camera.y += (nextH-viewH)/2;
+  viewW = nextW;
+  viewH = nextH;
+  dpr = nextDpr;
+  canvas.width = Math.round(viewW*dpr);
+  canvas.height = Math.round(viewH*dpr);
+  ctx.setTransform(canvas.width/viewW,0,0,canvas.height/viewH,0,0);
+  resetGesture();
+}
+
+function canvasPoint(clientX,clientY) {
+  const rect = canvas.getBoundingClientRect();
+  return {x:(clientX-rect.left)*viewW/rect.width, y:(clientY-rect.top)*viewH/rect.height};
+}
+
+// Pick visible objects from front to back before testing the ground diamond.
+function pointInPolygon(x,y,points) {
+  let hit = false;
+  for (let i=0,j=points.length-1; i<points.length; j=i++) {
+    const [xi,yi] = points[i], [xj,yj] = points[j];
+    if ((yi>y)!==(yj>y) && x<(xj-xi)*(y-yi)/(yj-yi)+xi) hit=!hit;
+  }
+  return hit;
+}
+
+function pickTile(sx,sy) {
+  for (let sum=W+H-2; sum>=0; sum--) for (let x=W-1; x>=0; x--) {
+    const y=sum-x;
+    if (!inside(x,y)) continue;
+    const i=idx(x,y), c=state.cells[i], p=iso(x,y);
+    const dx=(sx-p.x)/zoom, dy=(sy-p.y)/zoom;
+    if (c.building) {
+      const scale=c.building === "capital" ? 1.35 : 1;
+      const bx=dx/scale, by=(dy-11)/scale;
+      if (pointInPolygon(bx,by,[[-7,0],[7,0],[7,-10],[9,-10],[0,-17],[-9,-10],[-7,-10]])) return i;
+      if (c.building === "outpost" && ((dx>=7 && dx<=9 && dy>=-9 && dy<=9) || (dx>=8 && dx<=16 && dy>=-9 && dy<=-4))) return i;
+      if (c.building === "capital" && dx>=9 && dx<=11 && dy>=-15 && dy<=9) return i;
+    }
+    if (c.ruin && ((dx>=-5 && dx<=-1 && dy>=2 && dy<=10) || (dx>=1 && dx<=6 && dy>=-1 && dy<=10))) return i;
+  }
+  return screenToTile(sx,sy);
 }
 
 function selectAt(clientX,clientY) {
-  const rect = canvas.getBoundingClientRect();
-  const i = screenToTile(clientX-rect.left,clientY-rect.top);
-  if (i == null) return;
-  selected = i;
+  const p = canvasPoint(clientX,clientY);
+  selected = pickTile(p.x,p.y);
   updateSelectionUI();
   el("mapHint").style.opacity = "0";
+}
+
+function resetGesture() {
+  const ids = [...pointers.keys()];
+  pointers.clear();
+  dragging = false;
+  moved = false;
+  pinchStart = null;
+  mapShell.classList.remove("dragging");
+  ids.forEach(id => { if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id); });
+}
+
+function rebaseGesture() {
+  const pts = [...pointers.values()];
+  pointerStart = pts[0];
+  cameraStart = {...camera};
+  pinchStart = null;
+  if (pts.length >= 2) {
+    const mid = {x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+    pinchStart = {distance:Math.max(1,Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)), zoom,
+      worldX:(mid.x-viewW/2-camera.x)/zoom, worldY:(mid.y-camera.y)/zoom};
+  }
 }
 
 function centerOnPlayer() {
@@ -679,63 +738,60 @@ function closeDialog(which) {
 
 function bindEvents() {
   canvas.addEventListener("pointerdown", (e) => {
-    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (pointers.size === 0) moved = false;
+    pointers.set(e.pointerId,canvasPoint(e.clientX,e.clientY));
     canvas.setPointerCapture(e.pointerId);
-    moved = false;
-
-    if (pointers.size === 1) {
-      dragging = true;
-      pointerStart = {x:e.clientX,y:e.clientY};
-      cameraStart = {...camera};
-      mapShell.classList.add("dragging");
-    } else if (pointers.size === 2) {
-      const pts = [...pointers.values()];
-      pinchStartDistance = Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
-      pinchStartZoom = zoom;
-      moved = true;
-    }
+    dragging = true;
+    if (pointers.size > 1) moved = true;
+    rebaseGesture();
+    mapShell.classList.add("dragging");
   });
 
   canvas.addEventListener("pointermove", (e) => {
     if (!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-
-    if (pointers.size >= 2) {
-      const pts = [...pointers.values()].slice(0,2);
+    const pt = canvasPoint(e.clientX,e.clientY);
+    pointers.set(e.pointerId,pt);
+    if (pointers.size >= 2 && pinchStart) {
+      const pts = [...pointers.values()];
       const distance = Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
-      const rect = canvas.getBoundingClientRect();
-      const midX = (pts[0].x+pts[1].x)/2 - rect.left;
-      const midY = (pts[0].y+pts[1].y)/2 - rect.top;
-      if (pinchStartDistance > 0) setZoom(pinchStartZoom * (distance/pinchStartDistance),midX,midY);
+      zoom = Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,pinchStart.zoom*distance/pinchStart.distance));
+      // The original world point stays under the moving midpoint, including at zoom limits.
+      camera.x = (pts[0].x+pts[1].x)/2-viewW/2-pinchStart.worldX*zoom;
+      camera.y = (pts[0].y+pts[1].y)/2-pinchStart.worldY*zoom;
       moved = true;
       return;
     }
-
-    if (!dragging) return;
-    const dx = e.clientX-pointerStart.x;
-    const dy = e.clientY-pointerStart.y;
-    if (Math.hypot(dx,dy) > 5) moved = true;
-    camera.x = cameraStart.x+dx;
-    camera.y = cameraStart.y+dy;
+    const dx = pt.x-pointerStart.x, dy = pt.y-pointerStart.y;
+    if (Math.hypot(dx,dy) > 6) moved = true;
+    if (moved) {
+      camera.x = cameraStart.x+dx;
+      camera.y = cameraStart.y+dy;
+    }
   });
 
   function releasePointer(e) {
-    const wasSingle = pointers.size === 1;
+    if (!pointers.has(e.pointerId)) return;
+    const pt = canvasPoint(e.clientX,e.clientY);
+    const tap = e.type === "pointerup" && pointers.size === 1 && !moved &&
+      Math.hypot(pt.x-pointerStart.x,pt.y-pointerStart.y) <= 6;
     pointers.delete(e.pointerId);
-    if (wasSingle && dragging && !moved) selectAt(e.clientX,e.clientY);
-    if (pointers.size === 0) {
-      dragging = false;
-      mapShell.classList.remove("dragging");
-    } else if (pointers.size === 1) {
-      const pt = [...pointers.values()][0];
-      dragging = true;
-      pointerStart = {...pt};
-      cameraStart = {...camera};
-    }
+    if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+    if (tap) selectAt(e.clientX,e.clientY);
+    if (!pointers.size) resetGesture();
+    else { moved = true; rebaseGesture(); }
   }
-
   canvas.addEventListener("pointerup",releasePointer);
   canvas.addEventListener("pointercancel",releasePointer);
+  canvas.addEventListener("lostpointercapture",releasePointer);
+  window.addEventListener("blur",resetGesture);
+  canvas.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    resetGesture();
+    const p = canvasPoint(e.clientX,e.clientY);
+    const delta = e.deltaY*(e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? viewH : 1);
+    setZoom(zoom*Math.exp(-delta*.0015),p.x,p.y);
+  }, {passive:false});
 
   document.querySelectorAll(".actions button").forEach((b) => b.addEventListener("click",() => act(b.dataset.action)));
   el("endTurnBtn").addEventListener("click",endTurn);
@@ -748,7 +804,9 @@ function bindEvents() {
   el("newGameBtn").addEventListener("click",resetGame);
   document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click",() => closeDialog(b.dataset.close)));
   window.addEventListener("resize",resize);
+  new ResizeObserver(resize).observe(mapShell);
   document.addEventListener("visibilitychange",() => {
+    resetGesture();
     if (!document.hidden) checkVersion();
   });
 }
@@ -769,7 +827,7 @@ async function cleanReload() {
   }
   if ("caches" in window) {
     const keys = await caches.keys();
-    await Promise.all(keys.map((k) => caches.delete(k)));
+    await Promise.all(keys.filter((k) => k.startsWith("guerra-minima-")).map((k) => caches.delete(k)));
   }
   location.reload();
 }
@@ -780,10 +838,10 @@ async function boot() {
     save();
   }
   terrain = generateTerrain(state.seed);
+  syncUI();
   resize();
   centerOnPlayer();
   bindEvents();
-  syncUI();
   requestAnimationFrame(render);
 
   const guideKey = "guerra-minima-guide-version";
