@@ -100,10 +100,10 @@
     <div class="help-block">
       <p><b>NEXO.</b> Guerra Mínima es estrategia online para jugar con amigos sin presión. El turno puede durar segundos o varios minutos. La gracia es observar, comparar, planificar y cerrar cuando vos decidís.</p>
       <p><b>Objetivo.</b> El cuartel rival es la meta principal. También existe victoria territorial al 60% en esta demo. Los puestos ★, monedas y fortificaciones son herramientas para construir ventaja.</p>
-      <p><b>Acciones.</b> Expandir, reforzar, mover y atacar cuestan 1 acción. Reforzar suma +1 tropa gratis. Fortificar cuesta ¤4 + 1 acción desde Tienda.</p>
+      <p><b>Acciones.</b> Expandir, reforzar, mover y atacar cuestan 1 acción. Reforzar es gratis en monedas: suma +1 en cualquier territorio propio o +2 si reforzás tu cuartel. Fortificar cuesta ¤4 + 1 acción desde Tienda.</p>
       <p><b>Expandir.</b> Neutral adyacente; un vecino propio necesita 2+ tropas y transfiere 1 al nuevo sector.</p>
-      <p><b>Mover.</b> Desde un territorio propio con 2+ tropas a un vecino propio; mueve 1 y deja al menos 1 atrás.</p>
-      <p><b>Atacar.</b> Seleccioná un rival adyacente. Ataca tu vecino con más tropas. 1d6 contra 1d6; empate favorece al defensor. El perdedor pierde 1 tropa salvo escudo.</p>
+      <p><b>Mover.</b> Desde un territorio propio con 2+ tropas a un vecino propio. Elegís cuántas trasladar y ves la situación resultante antes de confirmar; siempre queda al menos 1 atrás. El traslado completo cuesta 1 acción.</p>
+      <p><b>Atacar.</b> Seleccioná un rival adyacente. Antes de confirmar ves origen, fuerzas, fortificación y probabilidad. Ataca tu vecino con más tropas. 1d6 contra 1d6; empate favorece al defensor. El perdedor pierde 1 tropa salvo escudo.</p>
       <p><b>Monedas.</b> Ingreso por territorio e hitos. Las tropas normales no cuestan monedas. La tienda se reserva para ventajas especiales.</p>
       <p><b>Leer al rival.</b> Rojo punteado = atacable. El aviso de amenaza cuenta sectores que el rival podría atacar ahora. RIVAL muestra qué hizo en su último turno.</p>
       <p><b>PLAN.</b> Es una libreta sobre el mapa: hasta 5 marcas numeradas, sin coste. No ejecuta movimientos ni altera el azar; sólo te ayuda a pensar.</p>
@@ -122,6 +122,26 @@
     <p id="endTurnCopy" class="dialog-copy"></p>
     <button id="confirmEndTurnBtn" class="primary-btn">SÍ, CERRAR TURNO</button>
     <button data-close="endturn" class="secondary-btn">VOLVER A PENSAR</button>
+  </dialog>
+
+  <dialog id="moveDialog">
+    <div class="dialog-head"><div><small>MOVIMIENTO · 1 ACCIÓN</small><h2>Redistribuir tropas</h2></div><button data-close="move">×</button></div>
+    <p class="dialog-copy">Elegí cuántas tropas trasladar. El territorio de origen siempre conserva al menos una.</p>
+    <div class="move-picker">
+      <strong id="moveAmountLabel">1 tropa</strong>
+      <input id="moveAmount" type="range" min="1" max="1" value="1" step="1" />
+    </div>
+    <p id="movePreview" class="preview-copy"></p>
+    <button id="confirmMoveBtn" class="primary-btn">CONFIRMAR MOVIMIENTO</button>
+    <button data-close="move" class="secondary-btn">CANCELAR</button>
+  </dialog>
+
+  <dialog id="attackDialog">
+    <div class="dialog-head"><div><small>COMBATE · 1 ACCIÓN</small><h2>Confirmar ataque</h2></div><button data-close="attack">×</button></div>
+    <p id="attackPreview" class="preview-copy"></p>
+    <p class="dialog-copy">La tirada recién ocurre al confirmar. Si cancelás, no gastás la acción.</p>
+    <button id="confirmAttackBtn" class="primary-btn">TIRAR Y ATACAR</button>
+    <button data-close="attack" class="secondary-btn">CANCELAR</button>
   </dialog>
 
   <div id="tutorialPanel" class="tutorial-panel" hidden>
