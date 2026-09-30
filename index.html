@@ -7,7 +7,7 @@
   <meta name="description" content="Guerra Mínima — prototipo de estrategia asíncrona." />
   <title>Guerra Mínima</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./style.css?v=0.1.0" />
+  <link rel="stylesheet" href="./style.css?v=0.1.1" />
 </head>
 <body>
   <main id="app">
@@ -37,7 +37,11 @@
 
     <section id="mapShell" class="map-shell" aria-label="Mapa de la partida">
       <canvas id="world"></canvas>
-      <div class="map-hint" id="mapHint">Arrastrá para recorrer el continente · Tocá una zona para seleccionarla</div>
+      <div class="map-hint" id="mapHint">Arrastrá para recorrer · Pellizcá para zoom · Bordes claros = alcance</div>
+      <div class="zoom-controls" aria-label="Zoom del mapa">
+        <button id="zoomInBtn" aria-label="Acercar">+</button>
+        <button id="zoomOutBtn" aria-label="Alejar">−</button>
+      </div>
       <button id="centerBtn" class="center-btn">⌖</button>
       <div id="toast" class="toast" aria-live="polite"></div>
     </section>
@@ -54,8 +58,8 @@
     <nav class="actions" aria-label="Acciones del turno">
       <button data-action="expand"><span>⚑</span>Expandir</button>
       <button data-action="build"><span>⌂</span>Construir</button>
-      <button data-action="harvest"><span>✦</span>Desarrollar</button>
-      <button data-action="explore"><span>◇</span>Ruinas</button>
+      <button data-action="harvest"><span>✦</span>Recolectar</button>
+      <button data-action="explore"><span>◇</span>Explorar</button>
       <button data-action="attack"><span>⚔</span>Intervenir</button>
     </nav>
 
@@ -80,9 +84,31 @@
       <div><small>DEMO LOCAL</small><h2>Partida</h2></div>
       <button data-close="menu">×</button>
     </div>
+    <button id="helpBtn" class="secondary-btn">Ver reglas y cambios</button>
     <button id="newGameBtn" class="danger-btn">Generar un continente nuevo</button>
     <p class="dialog-copy">La partida se guarda automáticamente en este dispositivo. El rival de esta versión es automático.</p>
-    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.1.0</b></div>
+    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.1.1</b></div>
+  </dialog>
+
+  <dialog id="helpDialog">
+    <div class="dialog-head">
+      <div><small>GUÍA · v0.1.1</small><h2>Qué podés hacer</h2></div>
+      <button data-close="help">×</button>
+    </div>
+    <div class="help-block">
+      <p><b>3 acciones por turno.</b> Cada acción de mapa gasta 1. Comprar o vender no gasta acciones, pero hay 3 operaciones de mercado por turno.</p>
+      <p><b>Expandir</b> — cuesta 2 comida. Solo podés tomar una casilla neutral pegada por un lado a tu territorio. Esas casillas aparecen con un borde claro.</p>
+      <p><b>Construir</b> — cuesta 6 madera, 3 piedra y 4 dinero. Se usa dentro de tu territorio. Crea un asentamiento o un puesto fronterizo.</p>
+      <p><b>Recolectar</b> — se usa dentro de tu territorio y convierte 1 acción en recursos. El resultado depende del terreno: valle da más comida, bosque más madera y colinas más piedra/metal.</p>
+      <p><b>Explorar</b> — solo en ruinas sin explorar. Te da dinero y materiales; si la ruina es neutral pero toca tu frontera, también pasa a tu control.</p>
+      <p><b>Intervenir</b> — cuesta 3 comida y 1 metal. Solo contra una casilla rival pegada a tu frontera. Tiene una probabilidad de éxito.</p>
+      <p><b>Alcance</b> — no podés saltar casillas. Tu territorio crece desde los bordes, una casilla por vez.</p>
+      <p><b>Zoom</b> — pellizcá con dos dedos o usá + / −. El botón ⌖ vuelve a tu capital.</p>
+    </div>
+    <div class="changelog">
+      <small>NUEVO EN v0.1.1</small>
+      <p>Zoom táctil y botones +/−, alcance visible en el mapa, nombres de acciones más claros y esta guía inicial.</p>
+    </div>
   </dialog>
 
   <div id="updateOverlay" class="update-overlay" hidden>
@@ -94,6 +120,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=0.1.0"></script>
+  <script type="module" src="./app.js?v=0.1.1"></script>
 </body>
 </html>
