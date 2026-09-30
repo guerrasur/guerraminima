@@ -58,3 +58,6 @@ Cada vez que se agregue o modifique una mecánica, acción, recurso, control, l�
 - no introducir mecánicas que dependan de reglas ocultas sin una señal visual o explicación en la interfaz.
 
 Esta documentación forma parte de la funcionalidad, no es opcional. Una feature nueva no se considera terminada hasta que su explicación para el jugador también esté actualizada.
+
+## Dirección visual (v0.2.0)
+Cómic psicodélico con tinta negra, verde ácido, ocre/naranja y azul; paneles negros y bordes blancos. Mantener texturas deterministas, lectura territorial +/× y selección visible. No alterar proyección/picking para decorar el terreno; conservar pruebas táctiles.

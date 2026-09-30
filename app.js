@@ -1,4 +1,4 @@
-const VERSION = "0.1.2";
+const VERSION = "0.2.0";
 const SAVE_KEY = "guerra-minima-save-v1";
 const W = 40;
 const H = 28;
@@ -448,13 +448,25 @@ function endTurn() {
 }
 
 function terrainColor(t, x, y) {
-  const v = hash(state.seed ^ 0xabc123, x, y);
-  if (t === "water") return v > .5 ? "#7899a0" : "#73929a";
-  if (t === "valley") return v > .5 ? "#9da66b" : "#a6ae75";
-  if (t === "forest") return v > .5 ? "#667c58" : "#6d835e";
-  if (t === "hills") return v > .5 ? "#a89670" : "#9f8d69";
-  if (t === "scrub") return v > .5 ? "#9b9c73" : "#92966e";
-  return v > .5 ? "#aab47f" : "#b2bb87";
+  const palette = {water:["#168eea","#198fe8"], valley:["#bbeb35","#b5e52e"], forest:["#81d719","#8adc1e"], hills:["#ffb52b","#f7aa23"], scrub:["#d2c83b","#d9ce41"], plains:["#d6e74a","#cee344"]};
+  return palette[t][hash(state.seed ^ 0xabc123,x,y) > .5 ? 1 : 0];
+}
+
+// Deterministic ink marks stay attached to the terrain while the camera moves.
+function drawGroundInk(p,t,x,y) {
+  ctx.save(); ctx.translate(p.x,p.y); ctx.scale(zoom,zoom);
+  ctx.strokeStyle = t === "water" ? "#075296" : "#24300d";
+  ctx.lineWidth = .55;
+  ctx.beginPath();
+  for (let k=0;k<12;k++) {
+    const u=hash(state.seed+k*137,x,y)*.8+.1;
+    const v=hash(state.seed+k*311+17,x,y)*.8+.1;
+    const a=(u-v)*24,b=(u+v)*12;
+    ctx.moveTo(a,b);
+    if(t === "water") {ctx.lineTo(a+2,b+.5);ctx.lineTo(a+4,b);}
+    else {ctx.lineTo(a+.8,b-.6); if(t === "valley" || t === "scrub") ctx.lineTo(a+1.6,b+1);}
+  }
+  ctx.stroke(); ctx.restore();
 }
 
 function iso(x,y) {
@@ -517,69 +529,67 @@ function outlineDiamond(p, color, width=2, dashed=false) {
   ctx.restore();
 }
 
+function inkShape(points,fill) {
+  ctx.beginPath(); points.forEach(([x,y],i)=>i ? ctx.lineTo(x,y) : ctx.moveTo(x,y));
+  ctx.closePath(); ctx.fillStyle=fill; ctx.fill(); ctx.stroke();
+}
 function drawTree(x,y,s) {
-  const z = zoom;
-  ctx.fillStyle = "#425d41";
-  ctx.beginPath(); ctx.arc(x,y,3.5*s*z,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle = "#334b35";
-  ctx.beginPath(); ctx.arc(x+2*s*z,y-2*s*z,3*s*z,0,Math.PI*2); ctx.fill();
+  ctx.save(); ctx.translate(x,y); ctx.scale(zoom*s,zoom*s);
+  ctx.strokeStyle="#101808"; ctx.lineWidth=.9;
+  inkShape([[-1,2],[0,-12],[2,-13],[1,2]],"#e5af37");
+  for(let side of [-1,1]) {
+    inkShape([[1,-12],[side*5,-16],[side*10,-12],[side*12,-7],[side*6,-10],[side*3,-9]],"#8deb1d");
+    ctx.beginPath();ctx.moveTo(1,-12);ctx.lineTo(side*8,-11);ctx.stroke();
+  }
+  inkShape([[0,-12],[-3,-18],[0,-20],[4,-17],[5,-12]],"#a2ec29");
+  ctx.restore();
 }
-
 function drawRuin(x,y,explored) {
-  const z = zoom;
-  ctx.fillStyle = explored ? "#756f60" : "#625c50";
-  ctx.fillRect(x-5*z,y-8*z,4*z,8*z);
-  ctx.fillRect(x+1*z,y-11*z,5*z,11*z);
-  ctx.fillStyle = "#c5b89a";
-  ctx.fillRect(x+2*z,y-9*z,2*z,2*z);
+  ctx.save();ctx.translate(x,y);ctx.scale(zoom,zoom);ctx.strokeStyle="#10120d";ctx.lineWidth=1;
+  const color=explored ? "#b7af70" : "#fff9d9";
+  inkShape([[-7,1],[-7,-9],[-4,-11],[-2,-8],[-2,1]],color);
+  inkShape([[2,1],[2,-13],[7,-15],[8,1]],color);
+  ctx.beginPath();ctx.moveTo(4,-11);ctx.lineTo(6,-8);ctx.lineTo(4,-5);ctx.moveTo(-5,-7);ctx.lineTo(-5,-2);ctx.stroke();
+  ctx.restore();
 }
-
 function drawBuilding(x,y,type,owner,time,i) {
-  const base = owner === "p" ? "#d9c978" : "#b46f67";
-  const roof = owner === "p" ? "#78672d" : "#6d3531";
-  const scale = (type === "capital" ? 1.35 : 1) * zoom;
-  ctx.fillStyle = base;
-  ctx.fillRect(x-7*scale,y-10*scale,14*scale,10*scale);
-  ctx.fillStyle = roof;
-  ctx.beginPath();
-  ctx.moveTo(x-9*scale,y-10*scale);
-  ctx.lineTo(x,y-17*scale);
-  ctx.lineTo(x+9*scale,y-10*scale);
-  ctx.closePath(); ctx.fill();
-
-  if (type === "outpost") {
-    ctx.strokeStyle = "#3b3426"; ctx.lineWidth = 2*zoom;
-    ctx.beginPath(); ctx.moveTo(x+8*zoom,y-2*zoom); ctx.lineTo(x+8*zoom,y-20*zoom); ctx.stroke();
-    ctx.fillStyle = owner === "p" ? "#e8da82" : "#cb6c64";
-    ctx.fillRect(x+8*zoom,y-20*zoom,8*zoom,5*zoom);
+  const scale=(type === "capital" ? 1.35 : 1)*zoom;
+  ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);
+  ctx.strokeStyle="#11120e";ctx.lineWidth=.9;
+  ctx.fillStyle="#fffbe8";ctx.fillRect(-7,-10,14,10);ctx.strokeRect(-7,-10,14,10);
+  inkShape([[2,-10],[7,-10],[7,0],[2,-1]],"#d3d0ac");
+  inkShape([[-9,-10],[0,-17],[9,-10]],owner === "p" ? "#f5ba2c" : "#f06a50");
+  ctx.fillStyle="#10120d";ctx.fillRect(-3,-5,3,5);ctx.fillRect(3,-7,2,2);
+  ctx.beginPath();ctx.moveTo(-5,-11);ctx.lineTo(0,-15);ctx.moveTo(0,-11);ctx.lineTo(3,-13);ctx.stroke();
+  if(type === "capital" || type === "outpost") {
+    ctx.beginPath();ctx.moveTo(8,0);ctx.lineTo(8,-24);ctx.stroke();
+    inkShape([[8,-24],[16,-23],[16,-17],[8,-18]],owner === "p" ? "#fffbe8" : "#f06a50");
+    ctx.fillStyle="#10120d";ctx.font="bold 7px sans-serif";ctx.textAlign="center";
+    ctx.fillText(owner === "p" ? "+" : "×",12,-18);
   }
-
-  if (type === "capital") {
-    ctx.strokeStyle = "#3b3426"; ctx.lineWidth = 2*zoom;
-    ctx.beginPath(); ctx.moveTo(x+10*zoom,y-2*zoom); ctx.lineTo(x+10*zoom,y-26*zoom); ctx.stroke();
-    ctx.font = (18*zoom) + "px system-ui";
-    ctx.textAlign = "left";
-    ctx.fillText(flag(owner === "p" ? state.playerCountry[1] : state.enemyCountry[1]),x+8*zoom,y-17*zoom);
-  }
-
-  const puff = (time/900 + i*.37) % 1;
-  ctx.fillStyle = "rgba(80,75,65," + (0.22*(1-puff)) + ")";
-  ctx.beginPath(); ctx.arc(x-3*zoom + Math.sin(time/600+i)*2*zoom, y-18*zoom-puff*14*zoom, (2+puff*3)*zoom, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
 }
-
 function drawAgents(x,y,owner,time,i) {
-  for (let a=0; a<2; a++) {
-    const phase = time/900 + i*.8 + a*2.4;
-    const dx = (Math.sin(phase)*10 + (a ? 4 : -3))*zoom;
-    const dy = (Math.cos(phase*.8)*4 + 3)*zoom;
-    ctx.fillStyle = owner === "p" ? "#f1df8b" : "#d77a70";
-    ctx.beginPath(); ctx.arc(x+dx,y+dy,1.8*zoom,0,Math.PI*2); ctx.fill();
+  for(let a=0;a<2;a++) {
+    const phase=time/1800+i*.8+a*2.4;
+    const dx=(Math.sin(phase)*8+(a?4:-3))*zoom,dy=(Math.cos(phase*.8)*3+3)*zoom;
+    ctx.save();ctx.translate(x+dx,y+dy);ctx.scale(zoom,zoom);
+    ctx.strokeStyle="#11120e";ctx.lineWidth=.8;
+    inkShape([[-2,1],[-2,-3],[-1,-4],[-1,-6],[1,-6],[1,-4],[2,-3],[2,1],[.5,1],[0,-1],[-.5,1]],owner === "p" ? "#fffef0" : "#ff7158");
+    ctx.restore();
   }
+}
+function drawHills(p) {
+  ctx.save();ctx.translate(p.x,p.y+13*zoom);ctx.scale(zoom,zoom);ctx.strokeStyle="#35230b";ctx.lineWidth=.8;
+  inkShape([[-12,0],[-9,-5],[-5,-12],[-2,-14],[1,-12],[6,0]],"#ffb32a");
+  inkShape([[0,0],[3,-6],[7,-10],[10,-8],[14,0]],"#ffc340");
+  ctx.beginPath();ctx.moveTo(-2,-12);ctx.lineTo(-4,-6);ctx.lineTo(-1,-3);ctx.moveTo(7,-8);ctx.lineTo(5,-3);
+  for(let k=0;k<6;k++){ctx.moveTo(-8+k*3,-2);ctx.lineTo(-7+k*3,-4);}ctx.stroke();ctx.restore();
 }
 
 function render(time=0) {
   ctx.clearRect(0,0,viewW,viewH);
-  ctx.fillStyle = "#78969b";
+  ctx.fillStyle = "#168eea";
   ctx.fillRect(0,0,viewW,viewH);
 
   for (let layer=0; layer<2; layer++) {
@@ -593,22 +603,29 @@ function render(time=0) {
         const t = terrain[i];
         const c = state.cells[i];
         if (layer === 0) {
-        diamond(p, terrainColor(t,x,y), t === "water" ? "rgba(255,255,255,.07)" : "rgba(63,69,48,.15)");
+        diamond(p, terrainColor(t,x,y), t === "water" ? null : "rgba(20,25,8,.5)");
 
+        drawGroundInk(p,t,x,y);
         if (c.owner) {
-          ctx.fillStyle = c.owner === "p" ? "rgba(228,207,98,.17)" : "rgba(177,75,67,.17)";
+          ctx.fillStyle = c.owner === "p" ? "rgba(255,255,225,.12)" : "rgba(237,74,54,.22)";
           const tw = TW*zoom, th = TH*zoom;
           ctx.beginPath();
           ctx.moveTo(p.x,p.y+2*zoom); ctx.lineTo(p.x+tw/2-2*zoom,p.y+th/2); ctx.lineTo(p.x,p.y+th-2*zoom); ctx.lineTo(p.x-tw/2+2*zoom,p.y+th/2); ctx.closePath(); ctx.fill();
         }
 
+        if(c.owner) {
+          ctx.save();ctx.font=`bold ${8*zoom}px sans-serif`;ctx.textAlign="center";
+          ctx.strokeStyle="#111";ctx.lineWidth=2*zoom;ctx.fillStyle=c.owner === "p" ? "#fffef2" : "#ff7965";
+          const emblem=c.owner === "p" ? "+" : "×";
+          ctx.strokeText(emblem,p.x,p.y+21*zoom);ctx.fillText(emblem,p.x,p.y+21*zoom);ctx.restore();
+        }
         if (state.ap > 0 && isLand(i) && c.owner === null && adjacentOwner(i,"p")) {
-          outlineDiamond(p,"rgba(255,245,177,.95)",Math.max(1.5,2.2*zoom),true);
+          outlineDiamond(p,"#fffef2",Math.max(1.5,2.2*zoom),true);
         } else if (state.ap > 0 && c.owner === "ai" && c.building !== "capital" && adjacentOwner(i,"p")) {
-          outlineDiamond(p,"rgba(255,177,163,.9)",Math.max(1.3,2*zoom),true);
+          outlineDiamond(p,"#ff695b",Math.max(1.3,2*zoom),true);
         }
 
-        if (selected === i) outlineDiamond(p,"#fff4bd",Math.max(2,2.8*zoom));
+        if (selected === i) outlineDiamond(p,"#ffffff",Math.max(2,2.8*zoom));
         continue;
         }
 
@@ -617,12 +634,7 @@ function render(time=0) {
           drawTree(p.x-7*zoom,p.y+11*zoom,.85);
           if (n>.35) drawTree(p.x+5*zoom,p.y+8*zoom,.7);
         }
-        if (t === "hills") {
-          ctx.fillStyle = "#81765f";
-          ctx.beginPath(); ctx.moveTo(p.x-10*zoom,p.y+13*zoom); ctx.lineTo(p.x-2*zoom,p.y+2*zoom); ctx.lineTo(p.x+5*zoom,p.y+13*zoom); ctx.fill();
-          ctx.fillStyle = "#92866a";
-          ctx.beginPath(); ctx.moveTo(p.x,p.y+13*zoom); ctx.lineTo(p.x+8*zoom,p.y+5*zoom); ctx.lineTo(p.x+13*zoom,p.y+13*zoom); ctx.fill();
-        }
+        if (t === "hills") drawHills(p);
         if (c.ruin) drawRuin(p.x,p.y+10*zoom,c.explored);
         if (c.building) {
           drawBuilding(p.x,p.y+11*zoom,c.building,c.owner,time,i);
@@ -634,6 +646,7 @@ function render(time=0) {
     }
 
   }
+  if(selected !== null) { const q=xy(selected);outlineDiamond(iso(q.x,q.y),"#111",5);outlineDiamond(iso(q.x,q.y),"#fffef2",2.5); }
   requestAnimationFrame(render);
 }
 

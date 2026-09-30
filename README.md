@@ -61,3 +61,7 @@ Se conservan las proporciones isométricas de v0.1.0. El lienzo ya no altera el 
 El arrastre sigue al dedo sin interpolación y el zoom conserva el punto del mapa entre ambos dedos. Soltar un dedo permite continuar arrastrando sin saltos; cancelar un gesto no selecciona. La rueda del mouse también permite hacer zoom. Una nueva partida vuelve a la capital. La limpieza de caché se limita a Guerra Mínima, sin borrar cachés de otros juegos del mismo dominio.
 
 Pruebas de regresión sin dependencias: `node --test tests/map.test.cjs`.
+
+## v0.2.0 — tinta y colores planos
+
+Dirección visual de cómic psicodélico: terrenos verde ácido, ocre y azul; texturas deterministas ancladas al mapa; palmeras, colinas, ruinas y edificios dibujados con Canvas. Interfaz negra con bordes blancos y botones táctiles de al menos 44 px. Territorios identificados con + (vos) y × (rival), además del color. La selección se dibuja encima de los objetos. Sin recursos externos ni cambios en reglas, guardado o geometría táctil.
