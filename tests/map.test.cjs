@@ -205,3 +205,23 @@ test('pending troop movement cannot spend an exhausted action or act after victo
   assert.equal(run('finishMove(neighbors(state.playerCapital)[0])'),false);
   assert.equal(run('state.cells[state.playerCapital].troops'),6);
 });
+
+
+test('v0.6 relaxed-turn NEXO exposes six actions and free planning',()=>{
+  const {run}=setup();
+  assert.equal(run('MAX_AP'),6);
+  assert.equal(run('state.ap'),6);
+  run('selected=state.playerCapital;togglePlan()');
+  assert.equal(run('state.plans.length'),1);
+  assert.equal(run('state.ap'),6);
+  run('togglePlan()');
+  assert.equal(run('state.plans.length'),0);
+});
+test('closing a turn clears planning and stores a navigable rival report',()=>{
+  const {run}=setup();
+  run('selected=state.playerCapital;togglePlan();endTurn()');
+  assert.equal(run('state.plans.length'),0);
+  assert.equal(run('Array.isArray(state.lastRivalReport)'),true);
+  assert.equal(run('state.lastRivalReport.every(x=>typeof x.text==="string")'),true);
+  assert.equal(run('state.ap'),6);
+});
