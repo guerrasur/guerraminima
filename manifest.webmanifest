@@ -1,0 +1,11 @@
+{
+  "name": "Guerra Mínima",
+  "short_name": "Guerra Mínima",
+  "description": "Prototipo local de estrategia por turnos.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#25342a",
+  "theme_color": "#25342a",
+  "orientation": "any"
+}
