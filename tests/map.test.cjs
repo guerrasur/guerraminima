@@ -131,13 +131,13 @@ test('new game starts with the simplified economy and defended HQs',()=>{
   assert.equal(run('state.cells.some(c=>c.ruin)'),false);
 });
 
-test('reinforce is free and spends one action for one troop',()=>{
+test('reinforce is free and spends one action for two troops',()=>{
   const {run}=setup();
   run('selected=state.playerCapital');
   const before=run('({money:state.resources.money,troops:state.cells[selected].troops,ap:state.ap})');
   run('act("reinforce")');
   assert.equal(run('state.resources.money'),before.money);
-  assert.equal(run('state.cells[selected].troops'),before.troops+1);
+  assert.equal(run('state.cells[selected].troops'),before.troops+2);
   assert.equal(run('state.ap'),before.ap-1);
 });
 
@@ -167,9 +167,9 @@ test('capturing the enemy HQ ends the match immediately',()=>{
 test('reinforce remains free at every turn',()=>{
   const {run}=setup();
   for(const turn of [1,8,16,30]) {
-    run(`state.turn=${turn};state.ap=3;state.resources.money=20;selected=state.playerCapital`);
+    run(`state.turn=${turn};state.ap=6;state.resources.money=20;selected=state.playerCapital`);
     const before=run('state.cells[selected].troops');run('act("reinforce")');
-    assert.equal(run('state.cells[selected].troops'),before+1);
+    assert.equal(run('state.cells[selected].troops'),before+2);
     assert.equal(run('state.resources.money'),20);
   }
 });
@@ -279,4 +279,70 @@ test('ending turn clears planning and records rival actions for later review',()
   assert.equal(run('Array.isArray(state.lastRivalReport)'),true);
   assert.equal(run('state.lastRivalReport.every(x=>typeof x.text==="string")'),true);
   assert.ok(run('state.turnHistory.length')>=1);
+});
+
+
+test('v0.7 reinforcement gives +2 on any owned sector for one action',()=>{
+  const {run}=setup();
+  const target=run('neighbors(state.playerCapital).find(i=>state.cells[i].owner==="p")');
+  const before=run(`({troops:state.cells[${target}].troops,ap:state.ap,money:state.resources.money})`);
+  run(`selected=${target};act("reinforce")`);
+  assert.equal(run(`state.cells[${target}].troops`),before.troops+2);
+  assert.equal(run('state.ap'),before.ap-1);
+  assert.equal(run('state.resources.money'),before.money);
+});
+
+test('replan restores the start-of-turn board before combat and preserves PLAN notes',()=>{
+  const {run}=setup();
+  run('captureTurnBaseline();selected=state.playerCapital;togglePlan();act("reinforce")');
+  assert.equal(run('state.cells[state.playerCapital].troops'),8);
+  assert.equal(run('canReplan()'),true);
+  assert.equal(run('replanTurn()'),true);
+  assert.equal(run('state.cells[state.playerCapital].troops'),6);
+  assert.equal(run('state.ap'),6);
+  assert.equal(run('state.plans.length'),1);
+  assert.equal(run('state.turnDirty'),false);
+});
+
+test('first committed attack locks replan to prevent rerolls',()=>{
+  const {run}=setup();
+  const target=run('neighbors(state.playerCapital)[0]');
+  run(`state.cells[${target}].owner="ai";state.cells[${target}].troops=2;captureTurnBaseline();selected=state.playerCapital;act("reinforce");selected=${target};requestAttack();confirmAttack()`);
+  assert.equal(run('state.turnCombatLocked'),true);
+  assert.equal(run('canReplan()'),false);
+});
+
+test('extra order costs five, adds one action and is limited to once per round',()=>{
+  const {run}=setup();
+  run('state.resources.money=20;captureTurnBaseline()');
+  assert.equal(run('buyExtraOrder()'),true);
+  assert.equal(run('state.resources.money'),15);
+  assert.equal(run('state.ap'),7);
+  assert.equal(run('buyExtraOrder()'),false);
+  assert.equal(run('state.resources.money'),15);
+  assert.equal(run('state.ap'),7);
+});
+
+test('extra order can be undone by replan before combat',()=>{
+  const {run}=setup();
+  run('state.resources.money=20;captureTurnBaseline();buyExtraOrder()');
+  assert.equal(run('canReplan()'),true);
+  run('replanTurn()');
+  assert.equal(run('state.resources.money'),20);
+  assert.equal(run('state.ap'),6);
+  assert.equal(run('state.extraOrderTurn'),null);
+});
+
+test('tutorial covers the full v0.7 loop and documentation locks the NEXO',()=>{
+  const {run}=setup();
+  assert.equal(run('TUTORIAL_STEPS.length'),15);
+  const dir=path.join(__dirname,'..');
+  const html=fs.readFileSync(path.join(dir,'index.html'),'utf8');
+  const readme=fs.readFileSync(path.join(dir,'README.md'),'utf8');
+  const claude=fs.readFileSync(path.join(dir,'CLAUDE.md'),'utf8');
+  assert.ok(html.includes('id="replanBtn"'));
+  assert.ok(html.includes('id="storeExtraBtn"'));
+  assert.ok(readme.includes('## NEXO'));
+  assert.ok(readme.includes('sin presión'));
+  assert.ok(claude.includes('NEXO — INVARIANTE PRINCIPAL'));
 });

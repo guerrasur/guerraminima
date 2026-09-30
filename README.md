@@ -1,136 +1,135 @@
 # Guerra Mínima
 
-Prototipo mobile-first de estrategia por turnos. Funciona enteramente en el navegador, guarda la partida en `localStorage` y se publica como sitio estático en GitHub Pages.
+Prototipo mobile-first de estrategia por turnos. La demo actual funciona enteramente en el navegador, guarda la partida en `localStorage` y se publica como sitio estático en GitHub Pages. Hoy se juega contra una IA local; el producto final está pensado para jugar online con amigos.
 
-## NEXO del juego — regla de producto
+## NEXO
 
 **Guerra Mínima es un juego online de estrategia para jugar con amigos sin presión.**
 
-Este principio está por encima de cualquier feature individual y debe usarse para evaluar futuras actualizaciones:
+Esta es la regla principal de producto y está por encima de cualquier feature individual:
 
-- no hay temporizadores que apuren al jugador ni cierre automático de turno;
+- no hay temporizador obligatorio ni cierre automático de turno;
 - un turno puede durar segundos, varios minutos o quedar esperando hasta que el jugador vuelva;
-- el jugador debe tener bastante información para mirar, comparar y pensar antes de actuar;
-- la profundidad buscada viene de leer el tablero, planificar y tomar decisiones, no de reaccionar rápido;
-- cerrar el turno es una decisión explícita del jugador cuando siente que terminó;
-- inspeccionar, mover la cámara, hacer zoom, consultar reglas, revisar al rival y usar herramientas de planificación no debe consumir acciones;
-- el diseño debe funcionar especialmente bien en partidas asíncronas o semi-asíncronas entre amigos;
-- si una feature vuelve el juego más rápido pero menos reflexivo, contradice el NEXO y no debe priorizarse.
+- el jugador debe poder mirar, comparar, consultar y planificar antes de actuar;
+- inspeccionar el mapa, mover cámara, hacer zoom, abrir reglas, revisar al rival y usar PLAN no consume acciones;
+- cerrar el turno es siempre una decisión explícita;
+- el multiplayer futuro debe tolerar ausencias y pausas sin castigos;
+- la profundidad buscada viene de leer el tablero y construir un plan, no de reaccionar rápido;
+- si una feature acelera el ritmo pero reduce la posibilidad de observar y pensar, contradice el NEXO.
 
 Frase guía: **Guerra Mínima no intenta que juegues rápido; intenta que siempre tengas algo interesante que pensar.**
 
-## v0.6.0 — Turno sin apuro
+## v0.7.0 — Pensar antes de cerrar
 
-1. **6 acciones por turno:** amplían el espacio de decisión sin añadir presión temporal. El turno sólo termina cuando el jugador toca Terminar turno y confirma.
-2. **Planificación sobre el mapa:** hasta 5 marcas numeradas gratuitas por turno. Sirven como libreta táctica y no ejecutan acciones ni modifican el combate.
-3. **Parte rival navegable:** conserva hasta 5 rondas recientes del enemigo. Cada evento puede centrar el mapa en el sector correspondiente.
-4. **Movimiento con vista previa:** una sola acción puede trasladar varias tropas entre territorios vecinos; antes de confirmar se ve cuántas quedan y cuántas llegan.
-5. **Ataques confirmados:** antes de tirar se muestran origen, fuerzas, fortificación y probabilidad. Cancelar no gasta acción.
-6. **Cuartel más importante:** reforzar cualquier sector da +1 tropa; reforzar tu cuartel da +2. En ambos casos no cuesta monedas.
-7. **Cierre protegido:** antes de terminar se muestran acciones restantes y marcas de planificación activas.
-8. **Tutorial completo:** 12 pasos guiados explican objetivo, mapa, selección, expansión, refuerzo, movimiento, combate, economía, planificación, lectura rival, cierre del turno y victoria.
-9. **Reglas separadas del tutorial:** el tutorial enseña el flujo; la guía queda disponible como referencia rápida dentro de la partida.
+1. **REPLANTEAR:** antes del primer ataque podés restaurar el estado exacto del comienzo de tu ronda: tropas, territorios, fortificaciones, dinero, acciones e hitos. Las marcas PLAN se conservan.
+2. **Anti-reroll:** en cuanto confirmás un ataque, REPLANTEAR queda bloqueado hasta la ronda siguiente.
+3. **Refuerzo +2 uniforme:** cualquier territorio propio recibe +2 tropas por 1 acción y ¤0.
+4. **Movimiento por cantidad:** elegís cuántas tropas trasladar entre vecinos propios y todo cuesta 1 acción.
+5. **Ataque con previsualización:** origen, fuerzas, fortificación y probabilidad aparecen antes de tirar.
+6. **Orden extra:** +1 acción por ¤5, máximo una vez por ronda.
+7. **Amenazas visibles:** los sectores propios atacables por el rival reciben un borde rojo punteado.
+8. **Parte rival al comenzar:** tras cerrar una ronda, el rival juega y su parte se abre para leer qué cambió.
+9. **Tutorial de 15 pasos:** enseña el juego de punta a punta.
+10. **Tests de invariantes:** protegen replanteo, anti-reroll, Orden extra, refuerzo +2, tutorial y NEXO.
 
-La demo sigue siendo local contra IA. La arquitectura futura de multiplayer debe preservar exactamente este ritmo: una partida puede esperar indefinidamente al jugador activo sin castigos por demora.
+La rama `backup-v0.6.0-before-v0.7.0` conserva el estado anterior.
 
+## Reglas actuales
 
-## v0.5.0 — Puntos calientes y mapa despejado
+### Victoria
 
-1. **Tres puestos estratégicos:** Paso Oeste (12,14), Valle Central (20,14), Paso Este (27,14), coordenadas internas desde 0. Cada puesto genera +¤2 por turno para su dueño.
-2. **Fortificar:** está en Tienda / más opciones. Cuesta ¤4 y una acción; un escudo absorbe la próxima tirada defensiva perdida.
-3. **Hitos:** 30 territorios, primer puesto y dos puestos dan +¤6 una sola vez por partida.
-4. **Refuerzo gratuito:** sumar 1 tropa cuesta una acción, pero no monedas.
-5. **Lectura visual:** estrellas, aviso de amenazas actuales, destinos de movimiento y botón para recorrer objetivos. Se redujeron paneles inferiores para darle más altura al mapa.
-
-Los saves anteriores se migran agregando puestos y progreso, conservando monedas, tropas, dueño de las casillas y ganador. La guía se muestra una vez al abrir la versión. La actualización elimina la victoria por puestos, las etapas de refuerzo y el parte de guerra.
-
-## Reglas base (v0.3.0; cambios de v0.4.0 arriba)
-
-La demo mantiene el mapa isométrico, la estética de tinta/colores planos y los controles táctiles de v0.2.0, pero simplifica por completo las reglas.
-
-### Objetivo
-
-Hay dos formas de ganar:
-
-- conquistar el cuartel rival;
-- controlar al menos el 60% del territorio terrestre del continente.
-
-Si el rival conquista tu cuartel o alcanza antes el 60%, perdés.
+Ganás si conquistás el cuartel rival o controlás al menos el 60% del territorio terrestre. Perdés si el rival logra cualquiera antes.
 
 ### Turno
 
-Cada jugador tiene 6 acciones por turno y no hay temporizador ni cierre automático. Las acciones posibles son:
+Cada jugador tiene **6 acciones base** y no existe reloj.
 
-- **Expandir:** ocupar una casilla neutral adyacente. Requiere que un territorio propio vecino tenga al menos 2 tropas; 1 tropa pasa al territorio nuevo.
-- **Reforzar:** no cuesta monedas. Agrega +1 tropa a un territorio propio o +2 si reforzás el cuartel. Consume 1 acción.
-- **Mover:** traslada la cantidad elegida de tropas entre dos territorios propios adyacentes en una sola acción. La vista previa muestra el resultado y el origen debe conservar al menos 1 tropa.
-- **Atacar:** prepara un ataque contra un territorio rival adyacente desde tu vecino con más tropas. Antes de confirmar muestra fuerzas, fortificación y probabilidad; recién al confirmar se tira y se consume la acción.
+- **Expandir:** neutral adyacente; un vecino propio con 2+ tropas transfiere 1 al nuevo sector.
+- **Reforzar:** +2 tropas sobre cualquier territorio propio. 1 acción, ¤0.
+- **Mover:** cantidad elegida entre territorios propios vecinos. 1 acción y al menos 1 tropa queda en origen.
+- **Atacar:** territorio rival adyacente; la tirada se realiza recién después de la previsualización.
+- **Fortificar:** ¤4 + 1 acción.
+- **Orden extra:** ¤5 para +1 acción, máximo una vez por ronda.
+
+Llegar a 0 acciones no cierra la ronda automáticamente.
+
+### PLAN
+
+PLAN es una libreta táctica gratuita: hasta 5 sectores numerados, sin coste de acción. No mueve tropas ni altera el combate. Se limpia al cerrar la ronda y se conserva al usar REPLANTEAR.
+
+### REPLANTEAR
+
+Al comenzar cada ronda se guarda un baseline interno. Antes de confirmar el primer ataque, REPLANTEAR restaura ese estado. El primer ataque bloquea el replanteo para impedir rerolls.
 
 ### Combate
 
-Cada ataque tira 1d6 para atacante y defensor.
+Cada lado tira 1d6. El empate favorece al defensor. El perdedor pierde 1 tropa. Una fortificación absorbe una tirada atacante ganada y se rompe. Si el defensor llega a 0, el territorio cambia de dueño con 1 tropa transferida desde el origen. Capturar el cuartel termina la partida.
 
-- si el atacante obtiene más, el defensor pierde 1 tropa;
-- empate o resultado menor favorece al defensor y el atacante pierde 1 tropa;
-- cuando un territorio defensor llega a 0 tropas, cambia de dueño y recibe 1 tropa atacante;
-- capturar el cuartel termina la partida inmediatamente.
+La probabilidad del atacante de ganar una tirada es 15/36, aproximadamente 42%.
 
 ### Economía
 
-Solo existe una moneda.
-
-Al comenzar cada turno se reciben monedas según la cantidad de territorios controlados:
+Ingreso por ronda:
 
 `max(2, floor(territorios / 5))`
 
-Las tropas normales no cuestan monedas. Las monedas quedan para opciones especiales como fortificar. Se eliminaron mercado, comida, madera, piedra, metal, recolección y ruinas como mecánicas jugables.
+Las tropas normales no cuestan monedas. Actualmente las monedas sirven para fortificar y comprar una Orden extra. Los hitos siguen siendo recompensas únicas.
+
+### Puestos estratégicos
+
+Hay tres puestos ★ en el eje central. Son puntos de interés e hitos de expansión, no una condición adicional de victoria.
 
 ### Leer al rival
 
-Las tropas son visibles sobre cada territorio.
+- número = tropas;
+- + = propio;
+- × = rival;
+- blanco punteado = neutral expandible;
+- rojo sobre rival = ataque disponible;
+- rojo punteado sobre propio = amenaza conocida;
+- RIVAL = historial reciente de acciones enemigas.
 
-- borde blanco punteado: territorio neutral que podés ocupar;
-- borde rojo punteado: territorio rival que podés atacar;
-- el botón **RIVAL** conserva un historial navegable de hasta 5 rondas recientes y permite saltar al sector de cada evento;
-- una acumulación de tropas cerca de tu frontera o cuartel representa una amenaza inmediata.
+Cada evento del parte puede centrar el mapa en su sector.
 
-El rival automático usa las mismas ideas básicas: expandirse, reforzar, mover tropas y atacar.
+## Tutorial y reglas
 
-## Controles
+**Tutorial completo** tiene 15 pasos y es la entrada principal para un jugador nuevo.
 
-- toque: seleccionar territorio;
-- arrastrar: mover la cámara;
-- pellizcar: zoom;
-- botones + / −: zoom alternativo;
-- ⌖: volver al cuartel.
+**Reglas y referencia rápida** sirve para consultar durante la partida.
 
-Mover la cámara o hacer zoom no consume acciones.
+Toda nueva mecánica debe actualizar ambos lugares cuando corresponda. No agregar reglas ocultas.
+
+## Dirección visual
+
+Mantener vista isométrica, mapa protagonista, tinta negra + verde ácido + ocre/naranja + azul, cámara táctil y HUD compacto. Evitar grandes paneles permanentes que vuelvan a comprimir el mapa.
+
+## Multiplayer futuro
+
+La demo local no debe fingir multiplayer real. Cuando se agregue backend, preservar turnos persistentes, ausencia de reloj obligatorio, posibilidad de volver más tarde, resumen de cambios y notificaciones informativas sin penalidades por demora.
 
 ## Publicación
 
-No requiere Firebase, servidor ni secretos. GitHub Pages sirve la raíz de `main`.
+GitHub Pages sirve la raíz de `main`. No hay Firebase ni backend en la demo actual.
 
-## Regla de versiones
+## Versionado
 
-Al publicar una versión, actualizar juntos:
+Actualizar juntos en cada release:
 
-1. `VERSION` en `app.js`;
-2. `version.json`;
-3. query strings `?v=X.Y.Z` de `index.html`;
-4. nombre de caché y URLs versionadas de `sw.js`.
+1. `VERSION` en app.js;
+2. version.json;
+3. `?v=X.Y.Z` de index.html;
+4. caché y URLs de sw.js.
 
-No borrar ni renombrar `guerra-minima-save-v1` salvo que exista una migración explícita. v0.3.0 migra las partidas anteriores al sistema de tropas/moneda única.
+No renombrar `guerra-minima-save-v1` sin migración explícita.
 
-## Regla de documentación
+## Documentación
 
-Toda mecánica o control nuevo debe quedar explicado también dentro de la guía/changelog del juego, incluyendo coste, alcance, límites y condición de uso.
+Una feature visible no está terminada hasta que se explica, aclara coste/alcance/límite, actualiza tutorial/reglas y respeta el NEXO.
 
 ## Pruebas
-
-Sin dependencias:
 
 ```bash
 node --test tests/map.test.cjs
 ```
 
-Las pruebas cubren geometría isométrica, selección táctil, drag/pinch, alineación del canvas, selección de edificios, orden de render y sincronización de versiones.
+GitHub Actions ejecuta la suite en cada push y pull request.

@@ -1,4 +1,4 @@
-const VERSION = "0.6.0";
+const VERSION = "0.7.0";
 const SAVE_KEY = "guerra-minima-save-v1";
 const W = 40;
 const H = 28;
@@ -10,6 +10,7 @@ const TERRITORY_WIN = 0.60;
 const START_MONEY = 12;
 const CAPITAL_TROOPS = 6;
 const FORT_COST = 4;
+const EXTRA_ORDER_COST = 5;
 const POSTS = [idx(12,14), idx(20,14), idx(27,14)];
 const POST_NAMES = ["Paso Oeste", "Valle Central", "Paso Este"];
 function postCount(owner) { return POSTS.filter(i => state.cells[i].owner === owner).length; }
@@ -197,7 +198,11 @@ function newState() {
     milestones:{p:[],ai:[]},
     plans:[],
     lastRivalReport:[],
-    turnHistory:[]
+    turnHistory:[],
+    turnBaseline:null,
+    turnDirty:false,
+    turnCombatLocked:false,
+    extraOrderTurn:null
   };
   for (const i of POSTS) fresh.cells[i].building = "outpost";
   return fresh;
@@ -225,6 +230,10 @@ function load() {
     state.plans = Array.isArray(state.plans) ? state.plans.filter(Number.isInteger).slice(0,MAX_PLANS) : [];
     state.lastRivalReport = Array.isArray(state.lastRivalReport) ? state.lastRivalReport : [];
     state.turnHistory = Array.isArray(state.turnHistory) ? state.turnHistory.slice(-12) : [];
+    state.turnBaseline = state.turnBaseline && state.turnBaseline.turn === state.turn ? state.turnBaseline : null;
+    state.turnDirty = !!state.turnDirty;
+    state.turnCombatLocked = !!state.turnCombatLocked;
+    state.extraOrderTurn = Number.isInteger(state.extraOrderTurn) ? state.extraOrderTurn : null;
     state.cells.forEach((c,i) => {
       c.ruin = false;
       c.explored = false;
@@ -247,6 +256,7 @@ function resetGame() {
   moveSource = null;
   pendingMove = null;
   pendingAttack = null;
+  captureTurnBaseline();
   resetGesture();
   zoom = 1;
   centerOnPlayer();
@@ -286,6 +296,58 @@ function strongestAdjacent(i, owner) {
   return candidates[0];
 }
 
+function makeTurnBaseline() {
+  return {
+    turn:state.turn,
+    cells:state.cells.map((c) => ({...c})),
+    resources:{...state.resources},
+    ap:state.ap,
+    log:[...state.log],
+    milestones:{p:[...(state.milestones?.p || [])],ai:[...(state.milestones?.ai || [])]},
+    extraOrderTurn:state.extraOrderTurn
+  };
+}
+
+function captureTurnBaseline() {
+  state.turnBaseline = makeTurnBaseline();
+  state.turnDirty = false;
+  state.turnCombatLocked = false;
+}
+
+function canReplan() {
+  return !!state.turnBaseline &&
+    state.turnBaseline.turn === state.turn &&
+    state.turnDirty &&
+    !state.turnCombatLocked &&
+    !state.winner;
+}
+
+function replanTurn() {
+  if (!canReplan()) {
+    toast(state.turnCombatLocked
+      ? "Después de atacar, la ronda queda fijada para evitar repetir tiradas."
+      : "Todavía no hay cambios para replantear.");
+    return false;
+  }
+  const baseline = state.turnBaseline;
+  state.cells = baseline.cells.map((c) => ({...c}));
+  state.resources = {...baseline.resources};
+  state.ap = baseline.ap;
+  state.log = [...baseline.log];
+  state.milestones = {p:[...baseline.milestones.p],ai:[...baseline.milestones.ai]};
+  state.extraOrderTurn = baseline.extraOrderTurn;
+  state.turnDirty = false;
+  state.turnCombatLocked = false;
+  moveSource = null;
+  pendingMove = null;
+  pendingAttack = null;
+  selected = null;
+  save();
+  syncUI();
+  toast("Replanteaste la ronda: volviste al inicio sin perder tus marcas PLAN.");
+  return true;
+}
+
 function syncUI() {
   el("warName").textContent = state.name;
   el("playerCountry").textContent = state.playerCountry[0];
@@ -304,10 +366,27 @@ function syncUI() {
     '<div class="resource"><span>⚑</span><b>' + pct + '%</b><small>territorio · meta 60%</small></div>';
 
   const threats = state.cells.filter((c,i) => c.owner === "p" && strongestAdjacent(i,"ai") != null).length;
-  el("threatLabel").textContent = threats ? "⚠ " + threats + " sectores bajo amenaza" : "Sin ataques posibles del rival en tu frontera";
+  el("threatLabel").textContent = threats
+    ? "⚠ " + threats + " sectores bajo amenaza conocida"
+    : "Frontera estable con las tropas visibles";
   el("threatLabel").classList[threats ? "add" : "remove"]("danger");
+
   const reportBtn = el("reportBtn");
   if (reportBtn) reportBtn.textContent = state.lastRivalReport.length ? "☷ RIVAL · " + state.lastRivalReport.length : "☷ RIVAL";
+
+  const replanBtn = el("replanBtn");
+  if (replanBtn) {
+    replanBtn.disabled = !canReplan();
+    replanBtn.textContent = state.turnCombatLocked ? "TURNO FIJADO" : "REPLANTEAR";
+  }
+
+  const extraBtn = el("storeExtraBtn");
+  if (extraBtn) {
+    const used = state.extraOrderTurn === state.turn;
+    extraBtn.disabled = used || state.resources.money < EXTRA_ORDER_COST || !!state.winner;
+    extraBtn.textContent = used ? "Orden extra · usada este turno" : "Orden extra · +1 acción · ¤" + EXTRA_ORDER_COST;
+  }
+
   refreshReportUI();
   updateSelectionUI();
 }
@@ -325,31 +404,28 @@ function ownerLabel(owner) {
 
 function updateSelectionUI() {
   if (selected == null) {
-    el("selectionTitle").textContent = moveSource == null ? "Tocá una zona del mapa" : "Elegí un territorio vecino";
-    el("selectionMeta").textContent = moveSource == null ? "Los números sobre el mapa son tropas." : "Mover transfiere 1 tropa y gasta 1 acción.";
+    el("selectionTitle").textContent = moveSource == null ? "Tocá una zona del mapa" : "Elegí un territorio propio vecino";
+    el("selectionMeta").textContent = moveSource == null
+      ? "Los números son tropas. Inspeccionar, hacer zoom y pensar no gasta acciones."
+      : "Después elegís cuántas tropas trasladar. El origen siempre conserva al menos 1.";
   } else {
     const c = state.cells[selected];
     const pos = xy(selected);
     let title = TERRAIN_LABELS[terrain[selected]];
     if (c.building === "capital") title = "Cuartel de " + ownerLabel(c.owner);
     if (c.building === "outpost") title = "★ " + POST_NAMES[POSTS.indexOf(selected)];
+
     const bits = [ownerLabel(c.owner), "sector " + (pos.x+1) + "." + (pos.y+1)];
     if (c.owner) bits.push((c.troops || 0) + ((c.troops || 0) === 1 ? " tropa" : " tropas"));
     if (c.building === "outpost") bits.push("objetivo estratégico");
     if (c.fort) bits.push("escudo: absorbe 1 derrota defensiva");
-    if (c.owner === null && isLand(selected)) {
-      bits.push(strongestAdjacent(selected,"p") != null ? "PODÉS EXPANDIR" : "necesitás 2 tropas en un vecino");
-    }
-    if (c.owner === "ai" && adjacentOwner(selected,"p")) {
-      const src = strongestAdjacent(selected,"p");
-      bits.push(src != null ? "PODÉS ATACAR" : "frontera rival · necesitás 2 tropas");
-    }
+    if (c.owner === null && isLand(selected)) bits.push(strongestAdjacent(selected,"p") != null ? "PODÉS EXPANDIR" : "necesitás 2 tropas en un vecino");
+    if (c.owner === "ai" && adjacentOwner(selected,"p")) bits.push(strongestAdjacent(selected,"p") != null ? "PODÉS ATACAR" : "frontera rival · necesitás 2 tropas");
     if (c.owner === "ai" && c.building === "capital") bits.push("tomarlo gana la partida");
     if (c.owner === "p" && selected === state.playerCapital) bits.push("protegé este cuartel");
-    if (c.owner === "ai" && strongestAdjacent(selected,"p") != null) {
-      const from = xy(strongestAdjacent(selected,"p"));
-      bits.push("desde " + (from.x+1) + "." + (from.y+1) + " · ganar dado: 42%");
-    }
+    if (c.owner === "p" && strongestAdjacent(selected,"ai") != null) bits.push("AMENAZADO desde " + sectorLabel(strongestAdjacent(selected,"ai")));
+    if (c.owner === "ai" && strongestAdjacent(selected,"p") != null) bits.push("atacarías desde " + sectorLabel(strongestAdjacent(selected,"p")) + " · ganar tirada: 42%");
+
     el("selectionTitle").textContent = title;
     el("selectionMeta").textContent = bits.join(" · ");
   }
@@ -357,6 +433,7 @@ function updateSelectionUI() {
   document.querySelectorAll(".actions button").forEach((button) => {
     button.disabled = !canAction(button.dataset.action);
   });
+
   const planBtn = el("planBtn");
   if (planBtn) {
     planBtn.disabled = selected == null || !isLand(selected);
@@ -364,8 +441,10 @@ function updateSelectionUI() {
   }
   const clearPlanBtn = el("clearPlanBtn");
   if (clearPlanBtn) clearPlanBtn.disabled = !state.plans.length;
+
   const reinforceLabel = el("reinforceLabel");
-  if (reinforceLabel) reinforceLabel.textContent = selected === state.playerCapital ? "Reforzar +2" : "Reforzar +1";
+  if (reinforceLabel) reinforceLabel.textContent = "Reforzar +2";
+
   const storeFortify = el("storeFortifyBtn");
   if (storeFortify) storeFortify.disabled = !canAction("fortify");
 }
@@ -445,6 +524,7 @@ function refreshReportUI() {
 
 function useAction() {
   state.ap = Math.max(0, state.ap - 1);
+  state.turnDirty = true;
 }
 
 function setWinner(owner, reason) {
@@ -599,6 +679,7 @@ function confirmAttack() {
   selected = target;
   pendingAttack = null;
   closeDialog("attack");
+  state.turnCombatLocked = true;
   const result = resolveCombat("p",target);
   addLog(result ? "Ataque: " + result.message + "." : "El ataque dejó de estar disponible.");
   useAction();
@@ -634,9 +715,8 @@ function act(action) {
   }
 
   if (action === "reinforce") {
-    const gain = selected === state.playerCapital ? 2 : 1;
-    c.troops += gain;
-    addLog("Reforzaste " + sectorLabel(selected) + ": +" + gain + (gain === 1 ? " tropa" : " tropas") + " gratis.");
+    c.troops += 2;
+    addLog("Reforzaste " + sectorLabel(selected) + ": +2 tropas gratis.");
   }
 
   if (action === "fortify") {
@@ -657,6 +737,27 @@ function grantIncome(owner) {
   return gain;
 }
 
+function buyExtraOrder() {
+  if (state.winner) return false;
+  if (state.extraOrderTurn === state.turn) {
+    toast("La Orden extra ya se usó en esta ronda.");
+    return false;
+  }
+  if (state.resources.money < EXTRA_ORDER_COST) {
+    toast("Necesitás ¤" + EXTRA_ORDER_COST + " para una Orden extra.");
+    return false;
+  }
+  state.resources.money -= EXTRA_ORDER_COST;
+  state.ap += 1;
+  state.extraOrderTurn = state.turn;
+  state.turnDirty = true;
+  addLog("Orden extra comprada: +1 acción para esta ronda.");
+  save();
+  syncUI();
+  toast("+1 acción. No agrega tiempo ni apuro: usala cuando quieras.");
+  return true;
+}
+
 function aiMoveTowardPlayer() {
   const options = [];
   for (let i=0; i<state.cells.length; i++) {
@@ -671,12 +772,12 @@ function aiMoveTowardPlayer() {
       if (toDist < fromDist) options.push([i,n,toDist]);
     }
   }
-  if (!options.length) return false;
+  if (!options.length) return null;
   options.sort((a,b) => a[2]-b[2]);
   const [from,to] = options[Math.floor(Math.random()*Math.min(5,options.length))];
   state.cells[from].troops -= 1;
   state.cells[to].troops += 1;
-  return true;
+  return {from,to};
 }
 
 function aiTurn() {
@@ -729,13 +830,14 @@ function aiTurn() {
       const score = i => Math.min(...(goals.length ? goals : [state.playerCapital]).map(t => Math.abs(xy(i).x-xy(t).x)+Math.abs(xy(i).y-xy(t).y))) + state.cells[i].troops*2;
       pool.sort((a,b) => score(a)-score(b));
       const i = pool[0];
-      state.cells[i].troops += 1;
-      record("Reforzó " + sectorLabel(i) + ".", i);
+      state.cells[i].troops += 2;
+      record("Reforzó " + sectorLabel(i) + " con +2 tropas.", i);
       continue;
     }
 
-    if (aiMoveTowardPlayer()) record("Movió tropas hacia tu frente.");
-    else record("Consolidó posiciones.");
+    const movedToward = aiMoveTowardPlayer();
+    if (movedToward) record("Movió una tropa de " + sectorLabel(movedToward.from) + " a " + sectorLabel(movedToward.to) + ".", movedToward.to);
+    else record("Consolidó posiciones.", state.enemyCapital);
   }
   return note;
 }
@@ -743,12 +845,15 @@ function aiTurn() {
 function requestEndTurn() {
   if (state.winner) return showVictory();
   const copy = el("endTurnCopy");
-  const used = MAX_AP - state.ap;
+  const budget = MAX_AP + (state.extraOrderTurn === state.turn ? 1 : 0);
+  const used = Math.max(0,budget - state.ap);
   const planCount = state.plans.length;
-  copy.textContent = "Usaste " + used + " de " + MAX_AP + " acciones. " +
+
+  copy.textContent = "Usaste " + used + " de " + budget + " acciones disponibles. " +
     (state.ap ? "Te quedan " + state.ap + ". " : "") +
-    (planCount ? "Tenés " + planCount + " marcas de planificación activas. " : "") +
+    (planCount ? "Tenés " + planCount + " marcas PLAN activas; se limpian al cerrar. " : "") +
     "No hay reloj: cerrá solamente cuando estés conforme.";
+
   el("endTurnDialog").showModal();
 }
 
@@ -758,25 +863,34 @@ function endTurn() {
   pendingMove = null;
   pendingAttack = null;
   state.plans = [];
+
   grantIncome("ai");
   const note = aiTurn();
   state.lastRivalReport = note;
+
   if (state.winner) {
     save();
     syncUI();
     return;
   }
+
   state.turn++;
   state.day++;
   state.ap = MAX_AP;
   const playerIncome = grantIncome("p");
   const compact = note.length ? note.slice(0,2).map(x=>x.text).join(" · ") : "Consolidó su territorio.";
+
   state.turnHistory.push({turn:state.turn-1, rival:note, income:playerIncome});
   state.turnHistory = state.turnHistory.slice(-12);
   addLog("Rival: " + compact + " Vos recibís ¤" + playerIncome + ".");
+
+  captureTurnBaseline();
   save();
   syncUI();
-  toast("Tu turno. Sin reloj · ingreso ¤" + playerIncome + ".");
+  toast("Nueva ronda. Sin reloj · revisá el parte y pensá antes de actuar.");
+
+  refreshReportUI();
+  if (note.length && !el("reportDialog").open) el("reportDialog").showModal();
 }
 
 function terrainColor(t, x, y) {
@@ -976,6 +1090,10 @@ function render(time=0) {
           outlineDiamond(p,"#ff695b",Math.max(1.3,2*zoom),true);
         }
 
+        if (c.owner === "p" && strongestAdjacent(i,"ai") != null) {
+          outlineDiamond(p,"#ff7965",Math.max(1.1,1.7*zoom),true);
+        }
+
         if (state.plans.includes(i)) {
           outlineDiamond(p,"#62e8ff",Math.max(2,2.6*zoom),true);
           ctx.save();
@@ -1133,21 +1251,26 @@ function closeDialog(which) {
   };
   const d = el(ids[which] || "menuDialog");
   if (d && d.open) d.close();
+  if (which === "move") pendingMove = null;
+  if (which === "attack") pendingAttack = null;
 }
 
 const TUTORIAL_STEPS = [
-  {title:"1 · El objetivo", target:"#enemyCountry", text:"Tu meta principal es abrirte camino y tomar el cuartel rival. El territorio, los puestos y la economía existen para ayudarte a llegar mejor preparado."},
-  {title:"2 · Leé el mapa", target:"#mapShell", text:"Antes de tocar nada, recorré el continente. Número = tropas. + es tu territorio; × es rival. Blanco punteado se puede expandir; rojo punteado se puede atacar."},
-  {title:"3 · Seleccioná y compará", target:"#selection", text:"Tocá cualquier sector para ver dueño, tropas, terreno, fortificación y si es atacable. Mirar, hacer zoom y mover la cámara nunca gasta acciones."},
-  {title:"4 · Expandir", target:'[data-action="expand"]', text:"Seleccioná un neutral junto a tus tierras. Un vecino propio necesita al menos 2 tropas: una pasa al territorio nuevo. Expandir gasta 1 acción."},
-  {title:"5 · Reforzar", target:'[data-action="reinforce"]', text:"En un territorio propio, Reforzar suma +1 tropa gratis. Cuesta 1 acción, no monedas. Elegí dónde concentrar fuerza."},
-  {title:"6 · Mover", target:'[data-action="move"]', text:"Elegí un territorio propio con 2+ tropas, tocá Mover y después un vecino propio. Antes de confirmar elegís cuántas tropas trasladar y ves cuántas quedan y llegan. Todo el traslado gasta 1 acción."},
-  {title:"7 · Atacar", target:'[data-action="attack"]', text:"Seleccioná un territorio rival adyacente. Antes de tirar, el juego muestra origen, fuerzas, fortificación y probabilidad. Confirmar recién entonces consume la acción."},
-  {title:"8 · Economía y tienda", target:"#resources", text:"Las monedas llegan por territorio y por hitos. No compran tropas normales: sirven para decisiones especiales como fortificar un sector desde Menú → Tienda."},
-  {title:"9 · Pensá el turno", target:"#planBtn", text:"PLAN es gratis: marcá hasta 5 sectores con números para recordar un orden, una amenaza o un objetivo. Las marcas desaparecen al cerrar el turno."},
-  {title:"10 · Revisá al rival", target:"#reportBtn", text:"Después del turno rival, RIVAL guarda cada movimiento importante. Tocá un evento y el mapa te lleva a ese sector. Sirve especialmente si retomás la partida más tarde."},
-  {title:"11 · Cerrá cuando quieras", target:"#endTurnBtn", text:"Tenés 6 acciones, pero ningún reloj. Podés pasar varios minutos mirando y pensando. Terminá el turno sólo cuando estés conforme; el juego te pide confirmación."},
-  {title:"12 · Cómo ganar", target:"#mapShell", text:"Protegé tu cuartel, construí un frente, usá puestos y fortificaciones cuando convenga y buscá el cuartel enemigo. El tutorial termina acá: el ritmo lo ponés vos."}
+  {title:"1 · El NEXO", target:"#mapShell", text:"Guerra Mínima se juega sin presión. No hay reloj, premio por rapidez ni cierre automático. Una ronda puede durar varios minutos: primero mirá y pensá; después actuá."},
+  {title:"2 · El objetivo", target:"#enemyCountry", text:"Tu meta principal es abrirte camino y tomar el cuartel rival. También ganás al controlar 60% de la tierra. Territorio, puestos y economía sirven para construir esa ventaja."},
+  {title:"3 · Leé el mapa", target:"#mapShell", text:"Número = tropas. + es tu territorio; × es rival. Blanco punteado se puede expandir; rojo sobre el rival se puede atacar; rojo sobre tus zonas señala amenazas conocidas."},
+  {title:"4 · Seleccioná y compará", target:"#selection", text:"Tocá cualquier sector para ver dueño, tropas, terreno, fortificación y riesgo. Mirar, hacer zoom, mover cámara y consultar información nunca gasta acciones."},
+  {title:"5 · Tus 6 acciones", target:".actions", text:"Expandir, reforzar, mover, atacar y fortificar consumen acciones. Tener 6 no significa jugar rápido: son margen para desarrollar una ronda con más decisiones."},
+  {title:"6 · Expandir", target:'[data-action="expand"]', text:"Seleccioná un neutral junto a tus tierras. Un vecino propio necesita al menos 2 tropas: una pasa al territorio nuevo. Expandir gasta 1 acción."},
+  {title:"7 · Reforzar", target:'[data-action="reinforce"]', text:"En cualquier territorio propio, Reforzar suma +2 tropas gratis. Cuesta 1 acción y no usa monedas."},
+  {title:"8 · Mover varias tropas", target:'[data-action="move"]', text:"Elegí un territorio propio con 2+ tropas, tocá Mover y después un vecino propio. Antes de confirmar elegís cuántas trasladar, cuánto queda atrás y cuánto llega. Todo el traslado cuesta 1 acción."},
+  {title:"9 · Atacar con información", target:'[data-action="attack"]', text:"Seleccioná un rival adyacente. Antes de tirar, ves origen, fuerzas, fortificación y probabilidad. Al confirmar el primer ataque, REPLANTEAR se bloquea para impedir repetir tiradas."},
+  {title:"10 · Economía y Tienda", target:"#resources", text:"Las monedas no compran tropas normales. Sirven para decisiones especiales: fortificar cuesta ¤4 + 1 acción; Orden extra cuesta ¤5 y suma +1 acción una vez por ronda."},
+  {title:"11 · PLAN", target:"#planBtn", text:"PLAN es una libreta táctica gratis. Marcá hasta 5 sectores numerados para recordar un orden, una amenaza o un objetivo. No modifica el tablero."},
+  {title:"12 · REPLANTEAR", target:"#replanBtn", text:"Antes de atacar, REPLANTEAR restaura tropas, acciones, dinero, hitos y fortificaciones al estado del inicio de la ronda. Tus marcas PLAN quedan para que pruebes otra idea."},
+  {title:"13 · Revisá al rival", target:"#reportBtn", text:"RIVAL guarda los movimientos de las últimas rondas. Tocá un evento y el mapa te lleva al sector. Al empezar una nueva ronda, el último parte se abre para que leas qué cambió."},
+  {title:"14 · Cerrá cuando quieras", target:"#endTurnBtn", text:"TERMINAR TURNO siempre pide confirmación. Aunque te queden acciones, podés seguir mirando todo el tiempo que quieras. El ritmo lo ponés vos; al cerrar juega el rival."},
+  {title:"15 · Cómo ganar", target:"#mapShell", text:"Protegé tu cuartel, construí un frente, usá puestos, PLAN, replanteo y fortificaciones cuando convenga, y buscá el cuartel enemigo. Ya conocés el juego de punta a punta."}
 ];
 let tutorialStep = 0;
 
@@ -1164,7 +1287,7 @@ function paintTutorialStep() {
 }
 
 function startTutorial() {
-  ["menuDialog","helpDialog","storeDialog","reportDialog"].forEach(id=>{const d=el(id); if(d?.open)d.close();});
+  ["menuDialog","helpDialog","storeDialog","reportDialog","moveDialog","attackDialog","endTurnDialog"].forEach(id=>{const d=el(id); if(d?.open)d.close();});
   tutorialStep = 0;
   el("tutorialPanel").hidden = false;
   paintTutorialStep();
@@ -1241,9 +1364,11 @@ function bindEvents() {
   });
   el("storeBtn").addEventListener("click",() => { closeDialog("menu"); el("storeDialog").showModal(); });
   el("storeFortifyBtn").addEventListener("click",() => { closeDialog("store"); act("fortify"); });
+  el("storeExtraBtn").addEventListener("click",buyExtraOrder);
   el("planBtn").addEventListener("click",togglePlan);
   el("clearPlanBtn").addEventListener("click",clearPlans);
   el("reportBtn").addEventListener("click",() => { refreshReportUI(); el("reportDialog").showModal(); });
+  el("replanBtn").addEventListener("click",replanTurn);
   el("endTurnBtn").addEventListener("click",requestEndTurn);
   el("confirmEndTurnBtn").addEventListener("click",() => { closeDialog("endturn"); endTurn(); });
   el("moveAmount").addEventListener("input",refreshMovePreview);
@@ -1300,6 +1425,8 @@ async function boot() {
     save();
   }
   terrain = generateTerrain(state.seed);
+  if (!state.turnBaseline || state.turnBaseline.turn !== state.turn) captureTurnBaseline();
+  save();
   syncUI();
   resize();
   centerOnPlayer();
