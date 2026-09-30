@@ -23,7 +23,7 @@ Principios actuales:
 - mapa más grande que la pantalla y cámara por drag/touch;
 - partidas largas y tranquilas;
 - 6 acciones por turno en v0.6.0, sin reloj ni cierre automático;
-- moneda única para reforzar y fortificar;
+- moneda única para opciones especiales; reforzar tropas no cuesta monedas;
 - países reales aleatorios como identidad visual, sin bonificaciones nacionales;
 - continente procedural con valle central y tres puestos estratégicos;
 - mundo visualmente vivo sin castigar al jugador por estar desconectado.
@@ -82,4 +82,9 @@ Reglas actuales en README y guía in-game: tres puestos, hitos únicos, escudos 
 
 ## Dirección de turno v0.6.0
 
-La ronda humana tiene 6 acciones, planificación gratuita de hasta 5 sectores, parte rival navegable y confirmación de cierre. El tutorial guiado de 12 pasos forma parte del producto. No convertir herramientas de lectura o planificación en costes de acción.
+La ronda humana tiene 6 acciones, planificación gratuita de hasta 5 sectores, parte rival navegable de hasta 5 rondas y confirmación de cierre.
+
+Movimiento: una acción puede trasladar varias tropas entre vecinos, con vista previa previa a confirmar y siempre dejando 1 tropa atrás.
+Ataque: antes de tirar se muestra origen, fuerzas, fortificación y probabilidad; cancelar no gasta acción.
+Refuerzo: +1 tropa en cualquier territorio propio, +2 en el cuartel; no cuesta monedas.
+El tutorial guiado de 12 pasos forma parte del producto. No convertir herramientas de lectura o planificación en costes de acción.
