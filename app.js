@@ -64,6 +64,8 @@ let moved = false;
 let pointerStart = null;
 let cameraStart = null;
 let moveSource = null;
+let pendingMove = null;
+let pendingAttack = null;
 
 let toastTimer = null;
 
@@ -243,6 +245,8 @@ function resetGame() {
   state = newState();
   selected = null;
   moveSource = null;
+  pendingMove = null;
+  pendingAttack = null;
   resetGesture();
   zoom = 1;
   centerOnPlayer();
@@ -360,6 +364,8 @@ function updateSelectionUI() {
   }
   const clearPlanBtn = el("clearPlanBtn");
   if (clearPlanBtn) clearPlanBtn.disabled = !state.plans.length;
+  const reinforceLabel = el("reinforceLabel");
+  if (reinforceLabel) reinforceLabel.textContent = selected === state.playerCapital ? "Reforzar +2" : "Reforzar +1";
   const storeFortify = el("storeFortifyBtn");
   if (storeFortify) storeFortify.disabled = !canAction("fortify");
 }
@@ -412,15 +418,22 @@ function clearPlans() {
 function refreshReportUI() {
   const body = el("reportBody");
   if (!body || !state) return;
-  if (!state.lastRivalReport.length) {
+  const reports = state.turnHistory.length
+    ? state.turnHistory.slice().reverse().slice(0,5)
+    : (state.lastRivalReport.length ? [{turn:Math.max(1,state.turn-1),rival:state.lastRivalReport}] : []);
+  if (!reports.length) {
     body.innerHTML = '<p class="empty-report">Todavía no hay un turno rival para revisar.</p>';
     return;
   }
-  body.innerHTML = state.lastRivalReport.map((line,i) =>
-    '<button class="report-event" data-report-index="'+i+'"><b>'+(i+1)+'.</b> '+line.text+'</button>'
+  body.innerHTML = reports.map((report,ri) =>
+    '<section class="report-turn"><small>RONDA '+report.turn+'</small>' +
+    report.rival.map((line,i) =>
+      '<button class="report-event" data-report-turn="'+ri+'" data-report-index="'+i+'"><b>'+(i+1)+'.</b> '+line.text+'</button>'
+    ).join("") + '</section>'
   ).join("");
   body.querySelectorAll(".report-event").forEach((button) => button.addEventListener("click",() => {
-    const item = state.lastRivalReport[Number(button.dataset.reportIndex)];
+    const report = reports[Number(button.dataset.reportTurn)];
+    const item = report?.rival?.[Number(button.dataset.reportIndex)];
     if (item && Number.isInteger(item.tile)) {
       selected = item.tile;
       centerOnTile(item.tile);
@@ -524,20 +537,85 @@ function finishMove(target) {
     toast("Movimiento cancelado: elegí un territorio propio vecino.");
     return false;
   }
-  state.cells[source].troops -= 1;
-  state.cells[target].troops += 1;
+  pendingMove = {source,target};
+  const max = state.cells[source].troops - 1;
+  const input = el("moveAmount");
+  input.max = String(max);
+  input.value = String(Math.min(max, Math.max(1, Math.ceil(max/2))));
+  el("movePreview").textContent = sectorLabel(source) + " → " + sectorLabel(target) +
+    " · quedan " + (state.cells[source].troops - Number(input.value)) +
+    " · llegan " + (state.cells[target].troops + Number(input.value));
+  el("moveDialog").showModal();
+  return true;
+}
+
+function refreshMovePreview() {
+  if (!pendingMove) return;
+  const {source,target} = pendingMove;
+  const input = el("moveAmount");
+  const max = state.cells[source].troops - 1;
+  let amount = Math.max(1, Math.min(max, Number(input.value) || 1));
+  input.value = String(amount);
+  el("moveAmountLabel").textContent = amount + (amount === 1 ? " tropa" : " tropas");
+  el("movePreview").textContent = sectorLabel(source) + " → " + sectorLabel(target) +
+    " · quedan " + (state.cells[source].troops - amount) +
+    " · llegan " + (state.cells[target].troops + amount);
+}
+
+function confirmMove() {
+  if (!pendingMove || state.winner || state.ap <= 0) return;
+  const {source,target} = pendingMove;
+  const max = state.cells[source].troops - 1;
+  const amount = Math.max(1, Math.min(max, Number(el("moveAmount").value) || 1));
+  state.cells[source].troops -= amount;
+  state.cells[target].troops += amount;
+  pendingMove = null;
   selected = target;
   useAction();
-  addLog("Moviste 1 tropa a un territorio vecino.");
+  addLog("Moviste " + amount + (amount === 1 ? " tropa" : " tropas") + " a " + sectorLabel(target) + ".");
+  closeDialog("move");
+  save();
+  syncUI();
+}
+
+function requestAttack() {
+  if (!canAction("attack")) {
+    toast("Ese territorio no se puede atacar ahora.");
+    return;
+  }
+  const target = selected;
+  const source = strongestAdjacent(target,"p");
+  pendingAttack = {source,target};
+  const a = state.cells[source];
+  const d = state.cells[target];
+  el("attackPreview").textContent =
+    sectorLabel(source) + " (" + a.troops + " tropas) → " + sectorLabel(target) + " (" + d.troops + " tropas)" +
+    (d.fort ? " · defensor fortificado" : "") +
+    " · cada lado tira 1d6 · ganás esta tirada con 15/36 (42%).";
+  el("attackDialog").showModal();
+}
+
+function confirmAttack() {
+  if (!pendingAttack || state.winner || state.ap <= 0) return;
+  const target = pendingAttack.target;
+  selected = target;
+  pendingAttack = null;
+  closeDialog("attack");
+  const result = resolveCombat("p",target);
+  addLog(result ? "Ataque: " + result.message + "." : "El ataque dejó de estar disponible.");
+  useAction();
   checkVictory();
   save();
   syncUI();
-  return true;
 }
 
 function act(action) {
   if (action === "move") {
     beginMove();
+    return;
+  }
+  if (action === "attack") {
+    requestAttack();
     return;
   }
   if (!canAction(action)) {
@@ -558,18 +636,14 @@ function act(action) {
   }
 
   if (action === "reinforce") {
-    c.troops += 1;
-    addLog("Reforzaste el sector: +1 tropa gratis.");
+    const gain = selected === state.playerCapital ? 2 : 1;
+    c.troops += gain;
+    addLog("Reforzaste " + sectorLabel(selected) + ": +" + gain + (gain === 1 ? " tropa" : " tropas") + " gratis.");
   }
 
   if (action === "fortify") {
     state.resources.money -= FORT_COST; c.fort = true;
     addLog("Fortificación lista: absorbe una derrota al defender. Costó ¤4.");
-  }
-
-  if (action === "attack") {
-    const result = resolveCombat("p",selected);
-    addLog(result ? "Ataque: " + result.message + "." : "No hay tropas suficientes para atacar.");
   }
 
   useAction();
@@ -683,6 +757,8 @@ function requestEndTurn() {
 function endTurn() {
   if (state.winner) return showVictory();
   moveSource = null;
+  pendingMove = null;
+  pendingAttack = null;
   state.plans = [];
   grantIncome("ai");
   const note = aiTurn();
@@ -1055,7 +1131,7 @@ function toast(text) {
 function closeDialog(which) {
   const ids = {
     help:"helpDialog", victory:"victoryDialog", store:"storeDialog", menu:"menuDialog",
-    report:"reportDialog", endturn:"endTurnDialog"
+    report:"reportDialog", endturn:"endTurnDialog", move:"moveDialog", attack:"attackDialog"
   };
   const d = el(ids[which] || "menuDialog");
   if (d && d.open) d.close();
@@ -1067,9 +1143,9 @@ const TUTORIAL_STEPS = [
   {title:"3 · Seleccioná y compará", target:"#selection", text:"Tocá cualquier sector para ver dueño, tropas, terreno, fortificación y si es atacable. Mirar, hacer zoom y mover la cámara nunca gasta acciones."},
   {title:"4 · Expandir", target:'[data-action="expand"]', text:"Seleccioná un neutral junto a tus tierras. Un vecino propio necesita al menos 2 tropas: una pasa al territorio nuevo. Expandir gasta 1 acción."},
   {title:"5 · Reforzar", target:'[data-action="reinforce"]', text:"En un territorio propio, Reforzar suma +1 tropa gratis. Cuesta 1 acción, no monedas. Elegí dónde concentrar fuerza."},
-  {title:"6 · Mover", target:'[data-action="move"]', text:"Elegí un territorio propio con 2+ tropas, tocá Mover y después un vecino propio. Siempre queda al menos 1 tropa atrás. Gasta 1 acción."},
-  {title:"7 · Atacar", target:'[data-action="attack"]', text:"Seleccioná un territorio rival adyacente. El ataque sale desde tu vecino con más tropas. El combate usa 1d6 por lado; empate favorece al defensor."},
-  {title:"8 · Economía y tienda", target:"#storeBtn", text:"Las monedas llegan por territorio y por hitos. No compran tropas normales: sirven para decisiones especiales como fortificar un sector."},
+  {title:"6 · Mover", target:'[data-action="move"]', text:"Elegí un territorio propio con 2+ tropas, tocá Mover y después un vecino propio. Antes de confirmar elegís cuántas tropas trasladar y ves cuántas quedan y llegan. Todo el traslado gasta 1 acción."},
+  {title:"7 · Atacar", target:'[data-action="attack"]', text:"Seleccioná un territorio rival adyacente. Antes de tirar, el juego muestra origen, fuerzas, fortificación y probabilidad. Confirmar recién entonces consume la acción."},
+  {title:"8 · Economía y tienda", target:"#resources", text:"Las monedas llegan por territorio y por hitos. No compran tropas normales: sirven para decisiones especiales como fortificar un sector desde Menú → Tienda."},
   {title:"9 · Pensá el turno", target:"#planBtn", text:"PLAN es gratis: marcá hasta 5 sectores con números para recordar un orden, una amenaza o un objetivo. Las marcas desaparecen al cerrar el turno."},
   {title:"10 · Revisá al rival", target:"#reportBtn", text:"Después del turno rival, RIVAL guarda cada movimiento importante. Tocá un evento y el mapa te lleva a ese sector. Sirve especialmente si retomás la partida más tarde."},
   {title:"11 · Cerrá cuando quieras", target:"#endTurnBtn", text:"Tenés 6 acciones, pero ningún reloj. Podés pasar varios minutos mirando y pensando. Terminá el turno sólo cuando estés conforme; el juego te pide confirmación."},
@@ -1172,6 +1248,9 @@ function bindEvents() {
   el("reportBtn").addEventListener("click",() => { refreshReportUI(); el("reportDialog").showModal(); });
   el("endTurnBtn").addEventListener("click",requestEndTurn);
   el("confirmEndTurnBtn").addEventListener("click",() => { closeDialog("endturn"); endTurn(); });
+  el("moveAmount").addEventListener("input",refreshMovePreview);
+  el("confirmMoveBtn").addEventListener("click",confirmMove);
+  el("confirmAttackBtn").addEventListener("click",confirmAttack);
   el("menuBtn").addEventListener("click",() => el("menuDialog").showModal());
   el("helpBtn").addEventListener("click",() => { closeDialog("menu"); el("helpDialog").showModal(); });
   el("tutorialBtn").addEventListener("click",startTutorial);
