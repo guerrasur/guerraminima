@@ -19,6 +19,17 @@ Esta es la regla principal de producto y está por encima de cualquier feature i
 
 Frase guía: **Guerra Mínima no intenta que juegues rápido; intenta que siempre tengas algo interesante que pensar.**
 
+## v0.8.0 — Entrar al turno informado
+
+1. **Tienda integrada:** sale del menú y vive junto a la selección, con el saldo visible durante el turno.
+2. **Tienda contextual:** Fortificar explica si el sector seleccionado es válido; Orden extra conserva su límite de una por ronda.
+3. **Resumen rival automático:** cada nueva ronda deja un parte compacto sobre el mapa. Si cerrás la app antes de leerlo, vuelve a aparecer al regresar.
+4. **Resumen navegable:** tocar un evento centra el mapa en el sector afectado. El botón RIVAL conserva el historial completo.
+5. **UX de acciones:** la Orden extra muestra correctamente un presupuesto de 7/7 y el primer render ya dice Refuerzo +2.
+6. **Tutorial menos invasivo:** una actualización de versión ya no fuerza a repetir el tutorial completo si ya lo habías visto.
+
+La rama `backup-v0.7.0-before-v0.8.0` conserva el estado anterior.
+
 ## v0.7.0 — Pensar antes de cerrar
 
 1. **REPLANTEAR:** antes del primer ataque podés restaurar el estado exacto del comienzo de tu ronda: tropas, territorios, fortificaciones, dinero, acciones e hitos. Las marcas PLAN se conservan.
@@ -73,7 +84,7 @@ Ingreso por ronda:
 
 `max(2, floor(territorios / 5))`
 
-Las tropas normales no cuestan monedas. Actualmente las monedas sirven para fortificar y comprar una Orden extra. Los hitos siguen siendo recompensas únicas.
+Las tropas normales no cuestan monedas. Actualmente las monedas sirven para fortificar y comprar una Orden extra. La Tienda está siempre accesible junto a la selección y muestra el saldo; la fortificación se evalúa sobre el sector seleccionado. Los hitos siguen siendo recompensas únicas.
 
 ### Puestos estratégicos
 
@@ -87,9 +98,10 @@ Hay tres puestos ★ en el eje central. Son puntos de interés e hitos de expans
 - blanco punteado = neutral expandible;
 - rojo sobre rival = ataque disponible;
 - rojo punteado sobre propio = amenaza conocida;
+- resumen rival de llegada = aparece automáticamente al volver a una ronda con movimientos enemigos pendientes;
 - RIVAL = historial reciente de acciones enemigas.
 
-Cada evento del parte puede centrar el mapa en su sector.
+El resumen automático persiste hasta que lo descartás o abrís el historial. Cada evento del parte puede centrar el mapa en su sector.
 
 ## Tutorial y reglas
 
