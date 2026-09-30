@@ -1,4 +1,4 @@
-const VERSION = "0.7.0";
+const VERSION = "0.8.0";
 const SAVE_KEY = "guerra-minima-save-v1";
 const W = 40;
 const H = 28;
@@ -202,7 +202,9 @@ function newState() {
     turnBaseline:null,
     turnDirty:false,
     turnCombatLocked:false,
-    extraOrderTurn:null
+    extraOrderTurn:null,
+    rivalBriefingTurn:null,
+    rivalBriefingSeen:true
   };
   for (const i of POSTS) fresh.cells[i].building = "outpost";
   return fresh;
@@ -234,6 +236,9 @@ function load() {
     state.turnDirty = !!state.turnDirty;
     state.turnCombatLocked = !!state.turnCombatLocked;
     state.extraOrderTurn = Number.isInteger(state.extraOrderTurn) ? state.extraOrderTurn : null;
+    const hadBriefingTurn = Number.isInteger(state.rivalBriefingTurn);
+    state.rivalBriefingTurn = hadBriefingTurn ? state.rivalBriefingTurn : (state.lastRivalReport.length ? state.turn : null);
+    state.rivalBriefingSeen = typeof state.rivalBriefingSeen === "boolean" ? state.rivalBriefingSeen : !state.lastRivalReport.length;
     state.cells.forEach((c,i) => {
       c.ruin = false;
       c.explored = false;
@@ -355,7 +360,8 @@ function syncUI() {
   el("playerFlag").textContent = flag(state.playerCountry[1]);
   el("enemyFlag").textContent = flag(state.enemyCountry[1]);
   el("dayLabel").textContent = "Día " + state.day + " · T" + state.turn;
-  el("apLabel").textContent = state.ap + "/" + MAX_AP;
+  const actionBudget = MAX_AP + (state.extraOrderTurn === state.turn ? 1 : 0);
+  el("apLabel").textContent = state.ap + "/" + actionBudget;
   el("versionLabel").textContent = "v" + VERSION;
   el("lastEvent").textContent = state.log[0] || "Sin reloj: revisá el mapa y cerrá el turno cuando quieras.";
 
@@ -370,6 +376,14 @@ function syncUI() {
     ? "⚠ " + threats + " sectores bajo amenaza conocida"
     : "Frontera estable con las tropas visibles";
   el("threatLabel").classList[threats ? "add" : "remove"]("danger");
+
+  const storeBtn = el("storeBtn");
+  if (storeBtn) {
+    storeBtn.disabled = !!state.winner;
+    storeBtn.textContent = "TIENDA · ¤" + state.resources.money;
+  }
+  const storeBalance = el("storeBalance");
+  if (storeBalance) storeBalance.textContent = "¤" + state.resources.money;
 
   const reportBtn = el("reportBtn");
   if (reportBtn) reportBtn.textContent = state.lastRivalReport.length ? "☷ RIVAL · " + state.lastRivalReport.length : "☷ RIVAL";
@@ -389,6 +403,7 @@ function syncUI() {
 
   refreshReportUI();
   updateSelectionUI();
+  refreshRivalBriefing();
 }
 
 function sectorLabel(i) {
@@ -446,7 +461,19 @@ function updateSelectionUI() {
   if (reinforceLabel) reinforceLabel.textContent = "Reforzar +2";
 
   const storeFortify = el("storeFortifyBtn");
-  if (storeFortify) storeFortify.disabled = !canAction("fortify");
+  const storeContext = el("storeContext");
+  if (storeFortify) {
+    storeFortify.disabled = !canAction("fortify");
+    if (selected == null) storeFortify.textContent = "Fortificar · seleccioná un sector propio";
+    else if (state.cells[selected].owner !== "p") storeFortify.textContent = "Fortificar · el sector debe ser tuyo";
+    else if (state.cells[selected].fort) storeFortify.textContent = "Fortificación · este sector ya tiene escudo";
+    else storeFortify.textContent = "Fortificar " + sectorLabel(selected) + " · ¤" + FORT_COST + " + 1 acción";
+  }
+  if (storeContext) {
+    if (selected == null) storeContext.textContent = "Seleccioná un territorio propio para evaluar una fortificación.";
+    else if (state.cells[selected].owner === "p") storeContext.textContent = sectorLabel(selected) + " · " + state.cells[selected].troops + " tropas" + (state.cells[selected].fort ? " · fortificado" : "");
+    else storeContext.textContent = "La fortificación solo se compra para un territorio propio.";
+  }
 }
 
 function canAction(action) {
@@ -519,6 +546,60 @@ function refreshReportUI() {
       updateSelectionUI();
       closeDialog("report");
     }
+  }));
+}
+
+function rivalBriefingVisible() {
+  return !!(!state.winner &&
+    state.lastRivalReport.length &&
+    state.rivalBriefingTurn === state.turn &&
+    !state.rivalBriefingSeen);
+}
+
+function acknowledgeRivalBriefing() {
+  if (!state || state.rivalBriefingSeen) return;
+  state.rivalBriefingSeen = true;
+  save();
+  refreshRivalBriefing();
+}
+
+function focusRivalBriefingEvent(index) {
+  const item = state.lastRivalReport[index];
+  if (item && Number.isInteger(item.tile)) {
+    moveSource = null;
+    selected = item.tile;
+    centerOnTile(item.tile);
+    updateSelectionUI();
+    toast("Parte rival: " + sectorLabel(item.tile) + " centrado.");
+  }
+  acknowledgeRivalBriefing();
+}
+
+function openRivalHistoryFromBriefing() {
+  acknowledgeRivalBriefing();
+  refreshReportUI();
+  el("reportDialog").showModal();
+}
+
+function refreshRivalBriefing() {
+  const card = el("rivalBriefing");
+  if (!card || !state) return;
+  const visible = rivalBriefingVisible();
+  card.hidden = !visible;
+  mapShell.classList[visible ? "add" : "remove"]("briefing-open");
+  if (!visible) return;
+
+  el("rivalBriefingTitle").textContent = "Ronda " + Math.max(1,state.turn-1) + " · " + state.enemyCountry[0];
+  const body = el("rivalBriefingBody");
+  const preview = state.lastRivalReport.slice(0,3);
+  body.innerHTML = preview.map((line,i) =>
+    '<button class="briefing-event" data-briefing-index="'+i+'"><b>'+(i+1)+'.</b><span>'+line.text+'</span></button>'
+  ).join("") +
+    (state.lastRivalReport.length > preview.length
+      ? '<small class="briefing-more">+'+(state.lastRivalReport.length-preview.length)+' movimientos en el historial completo</small>'
+      : '');
+  body.querySelectorAll(".briefing-event").forEach((button) => button.addEventListener("click",() => {
+    focusRivalBriefingEvent(Number(button.dataset.briefingIndex));
   }));
 }
 
@@ -877,6 +958,8 @@ function endTurn() {
   state.turn++;
   state.day++;
   state.ap = MAX_AP;
+  state.rivalBriefingTurn = state.turn;
+  state.rivalBriefingSeen = note.length === 0;
   const playerIncome = grantIncome("p");
   const compact = note.length ? note.slice(0,2).map(x=>x.text).join(" · ") : "Consolidó su territorio.";
 
@@ -887,10 +970,7 @@ function endTurn() {
   captureTurnBaseline();
   save();
   syncUI();
-  toast("Nueva ronda. Sin reloj · revisá el parte y pensá antes de actuar.");
-
-  refreshReportUI();
-  if (note.length && !el("reportDialog").open) el("reportDialog").showModal();
+  toast("Nueva ronda. Sin reloj · el resumen rival quedó sobre el mapa.");
 }
 
 function terrainColor(t, x, y) {
@@ -1265,10 +1345,10 @@ const TUTORIAL_STEPS = [
   {title:"7 · Reforzar", target:'[data-action="reinforce"]', text:"En cualquier territorio propio, Reforzar suma +2 tropas gratis. Cuesta 1 acción y no usa monedas."},
   {title:"8 · Mover varias tropas", target:'[data-action="move"]', text:"Elegí un territorio propio con 2+ tropas, tocá Mover y después un vecino propio. Antes de confirmar elegís cuántas trasladar, cuánto queda atrás y cuánto llega. Todo el traslado cuesta 1 acción."},
   {title:"9 · Atacar con información", target:'[data-action="attack"]', text:"Seleccioná un rival adyacente. Antes de tirar, ves origen, fuerzas, fortificación y probabilidad. Al confirmar el primer ataque, REPLANTEAR se bloquea para impedir repetir tiradas."},
-  {title:"10 · Economía y Tienda", target:"#resources", text:"Las monedas no compran tropas normales. Sirven para decisiones especiales: fortificar cuesta ¤4 + 1 acción; Orden extra cuesta ¤5 y suma +1 acción una vez por ronda."},
+  {title:"10 · Economía y Tienda", target:"#storeBtn", text:"La Tienda está siempre al lado de la selección. Las monedas no compran tropas normales: sirven para fortificar un sector propio o comprar una Orden extra."},
   {title:"11 · PLAN", target:"#planBtn", text:"PLAN es una libreta táctica gratis. Marcá hasta 5 sectores numerados para recordar un orden, una amenaza o un objetivo. No modifica el tablero."},
   {title:"12 · REPLANTEAR", target:"#replanBtn", text:"Antes de atacar, REPLANTEAR restaura tropas, acciones, dinero, hitos y fortificaciones al estado del inicio de la ronda. Tus marcas PLAN quedan para que pruebes otra idea."},
-  {title:"13 · Revisá al rival", target:"#reportBtn", text:"RIVAL guarda los movimientos de las últimas rondas. Tocá un evento y el mapa te lleva al sector. Al empezar una nueva ronda, el último parte se abre para que leas qué cambió."},
+  {title:"13 · Revisá al rival", target:"#reportBtn", text:"Al volver a tu turno aparece un resumen rival sobre el mapa. RIVAL conserva además el historial de las últimas rondas: tocá un evento y el mapa te lleva al sector."},
   {title:"14 · Cerrá cuando quieras", target:"#endTurnBtn", text:"TERMINAR TURNO siempre pide confirmación. Aunque te queden acciones, podés seguir mirando todo el tiempo que quieras. El ritmo lo ponés vos; al cerrar juega el rival."},
   {title:"15 · Cómo ganar", target:"#mapShell", text:"Protegé tu cuartel, construí un frente, usá puestos, PLAN, replanteo y fortificaciones cuando convenga, y buscá el cuartel enemigo. Ya conocés el juego de punta a punta."}
 ];
@@ -1297,6 +1377,7 @@ function stopTutorial() {
   el("tutorialPanel").hidden = true;
   document.querySelectorAll(".tutorial-focus").forEach(n=>n.classList.remove("tutorial-focus"));
   localStorage.setItem("guerra-minima-tutorial-version",VERSION);
+  localStorage.setItem("guerra-minima-tutorial-complete-v1","1");
 }
 
 function bindEvents() {
@@ -1362,12 +1443,15 @@ function bindEvents() {
     const current = POSTS.indexOf(selected);
     selected = POSTS[(current+1)%POSTS.length]; centerOnTile(selected); updateSelectionUI();
   });
-  el("storeBtn").addEventListener("click",() => { closeDialog("menu"); el("storeDialog").showModal(); });
+  el("storeBtn").addEventListener("click",() => el("storeDialog").showModal());
   el("storeFortifyBtn").addEventListener("click",() => { closeDialog("store"); act("fortify"); });
   el("storeExtraBtn").addEventListener("click",buyExtraOrder);
   el("planBtn").addEventListener("click",togglePlan);
   el("clearPlanBtn").addEventListener("click",clearPlans);
-  el("reportBtn").addEventListener("click",() => { refreshReportUI(); el("reportDialog").showModal(); });
+  el("reportBtn").addEventListener("click",() => { acknowledgeRivalBriefing(); refreshReportUI(); el("reportDialog").showModal(); });
+  el("briefingDismissBtn").addEventListener("click",acknowledgeRivalBriefing);
+  el("briefingOkBtn").addEventListener("click",acknowledgeRivalBriefing);
+  el("briefingHistoryBtn").addEventListener("click",openRivalHistoryFromBriefing);
   el("replanBtn").addEventListener("click",replanTurn);
   el("endTurnBtn").addEventListener("click",requestEndTurn);
   el("confirmEndTurnBtn").addEventListener("click",() => { closeDialog("endturn"); endTurn(); });
@@ -1434,8 +1518,9 @@ async function boot() {
   requestAnimationFrame(render);
   if (state.winner) showVictory();
 
-  const tutorialKey = "guerra-minima-tutorial-version";
-  if (localStorage.getItem(tutorialKey) !== VERSION) startTutorial();
+  const tutorialCompleteKey = "guerra-minima-tutorial-complete-v1";
+  const legacyTutorialKey = "guerra-minima-tutorial-version";
+  if (localStorage.getItem(tutorialCompleteKey) !== "1" && !localStorage.getItem(legacyTutorialKey)) startTutorial();
 
   checkVersion();
   setInterval(checkVersion,60000);
