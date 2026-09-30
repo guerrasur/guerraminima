@@ -95,3 +95,27 @@ test('release versions and cache remain synchronized',()=>{
   for(const file of ['app.js','index.html','sw.js'])assert.ok(fs.readFileSync(path.join(dir,file),'utf8').includes(v));
   assert.ok(fs.readFileSync(path.join(dir,'app.js'),'utf8').includes('guerra-minima-save-v1'));
 });
+
+test('v0.3 core starts with one currency, visible troops and two live headquarters',()=>{
+  const {run}=setup();
+  assert.equal(run('Object.keys(state.resources).join(",")'),'money');
+  assert.equal(run('state.cells[state.playerCapital].troops'),6);
+  assert.equal(run('state.cells[state.enemyCapital].troops'),6);
+  assert.equal(run('state.cells[state.playerCapital].building'),'capital');
+  assert.equal(run('state.cells[state.enemyCapital].building'),'capital');
+});
+test('expanding transfers one troop and consumes one action',()=>{
+  const {run}=setup();
+  assert.equal(run(`(()=>{
+    const target=state.cells.findIndex((c,i)=>isLand(i)&&c.owner===null&&neighbors(i).some(n=>state.cells[n].owner==='p'));
+    if(target<0)return false;
+    const source=neighbors(target).find(n=>state.cells[n].owner==='p');
+    state.cells[source].troops=3; selected=target;
+    const before=state.ap; act('expand');
+    return state.cells[target].owner==='p'&&state.cells[target].troops===1&&state.cells[source].troops===2&&state.ap===before-1;
+  })()`),true);
+});
+test('capturing the enemy headquarters is a victory condition',()=>{
+  const {run}=setup();
+  assert.equal(run(`(()=>{state.cells[state.enemyCapital].owner='p';checkVictory();return state.winner==='p'&&state.victoryReason.includes('cuartel rival')})()`),true);
+});
