@@ -7,7 +7,7 @@
   <meta name="description" content="Guerra Mínima — prototipo de estrategia asíncrona." />
   <title>Guerra Mínima</title>
   <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="./style.css?v=0.3.0" />
+  <link rel="stylesheet" href="./style.css?v=0.4.0" />
 </head>
 <body>
   <main id="app">
@@ -33,6 +33,8 @@
       </div>
 
       <div id="resources" class="resources"></div>
+      <div class="campaign"><div><b id="phaseLabel"></b><span id="incomeLabel"></span></div>
+      <p id="campaignStatus"></p><div class="campaign-track"><i id="campaignMeter"></i></div></div>
     </header>
 
     <section id="mapShell" class="map-shell" aria-label="Mapa de la partida">
@@ -42,6 +44,8 @@
         <button id="zoomInBtn" aria-label="Acercar">+</button>
         <button id="zoomOutBtn" aria-label="Alejar">−</button>
       </div>
+      <div class="map-tools"><button id="objectiveBtn">★ PUESTOS</button><button id="reportBtn">☷ PARTE</button></div>
+      <div id="threatLabel" class="threat-label"></div>
       <button id="centerBtn" class="center-btn">⌖</button>
       <div id="toast" class="toast" aria-live="polite"></div>
     </section>
@@ -56,9 +60,10 @@
 
     <nav class="actions" aria-label="Acciones del turno">
       <button data-action="expand"><span>⚑</span>Expandir</button>
-      <button data-action="reinforce"><span>♟</span>Reforzar</button>
+      <button data-action="reinforce"><span>♟</span><b id="reinforceLabel">Reforzar +1</b></button>
       <button data-action="move"><span>➜</span>Mover</button>
       <button data-action="attack"><span>⚔</span>Atacar</button>
+      <button data-action="fortify"><span>▱</span>Fortificar ¤4</button>
     </nav>
 
     <footer class="turn-footer">
@@ -75,30 +80,42 @@
     <button id="helpBtn" class="secondary-btn">Ver reglas y cambios</button>
     <button id="newGameBtn" class="danger-btn">Generar un continente nuevo</button>
     <p class="dialog-copy">La partida se guarda automáticamente en este dispositivo. El rival juega sus 3 acciones después de que terminás tu turno.</p>
-    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.3.0</b></div>
+    <div class="version-line">Guerra Mínima <b id="versionLabel">v0.4.0</b></div>
   </dialog>
 
   <dialog id="helpDialog">
     <div class="dialog-head">
-      <div><small>GUÍA · v0.3.0</small><h2>Cómo se juega</h2></div>
+      <div><small>GUÍA · v0.4.0</small><h2>Cómo se juega</h2></div>
       <button data-close="help">×</button>
     </div>
+    <div class="changelog"><small>NUEVO EN v0.4.0 · PUNTOS CALIENTES</small>
+      <ol>
+        <li><b>Tres puestos ★.</b> Paso Oeste, Valle Central y Paso Este. Cada uno paga +¤2 al inicio de tu turno mientras lo controles. Se conquistan igual que cualquier territorio.</li>
+        <li><b>Victoria por control.</b> Mantené al menos 2 puestos durante 3 cierres de ronda consecutivos (después del rival). Perder el segundo puesto reinicia el contador inmediatamente. También podés ganar tomando el cuartel rival o el 60% del mapa. El rival tiene las mismas condiciones.</li>
+        <li><b>Tres etapas.</b> Turnos 1–7: reforzar agrega 1 tropa. Turnos 8–15: agrega 2. Desde el 16: agrega 3. Siempre cuesta ¤2 y 1 acción, para ambos bandos.</li>
+        <li><b>Fortificaciones.</b> Elegí un territorio propio y gastá ¤4 + 1 acción. Su escudo absorbe la próxima tirada perdida al defender y se rompe sin bajas. Máximo 1 escudo por sector; podés reconstruirlo. Borde celeste = fortificado.</li>
+        <li><b>Hitos con recompensa.</b> Controlar 30 territorios, tomar un puesto y controlar dos puestos dan +¤6 cada uno, una sola vez por bando. Consultalos en PARTE.</li>
+        <li><b>Mapa e información.</b> Estrellas sobre los puestos, barra de control, ingreso del próximo turno, aviso de sectores amenazados y destinos celestes al mover. PUESTOS recorre los tres objetivos sin gastar acciones.</li>
+        <li><b>Rival con rumbo.</b> Busca los puestos y fortifica objetivos expuestos. PARTE permite leer sus tres acciones completas.</li>
+      </ol>
+    </div>
     <div class="help-block">
-      <p><b>Objetivo.</b> Ganás si tomás el cuartel rival o si controlás el 60% del continente.</p>
-      <p><b>3 acciones por turno.</b> Cada movimiento, expansión, refuerzo o ataque gasta 1 acción.</p>
-      <p><b>Monedas.</b> Al empezar tu turno cobrás según cuántos territorios controlás. Reforzar cuesta ¤2 y suma 1 tropa al sector elegido.</p>
-      <p><b>Tropas.</b> El número sobre cada territorio indica cuántas hay. Siempre tiene que quedar al menos 1 tropa defendiendo un territorio.</p>
-      <p><b>Expandir.</b> Elegí una casilla neutral junto a tu frontera. Necesitás un territorio vecino con al menos 2 tropas: una de ellas pasa al nuevo territorio.</p>
-      <p><b>Mover.</b> Elegí un territorio propio con 2 o más tropas, tocá Mover y después un territorio propio vecino. Se transfiere 1 tropa.</p>
-      <p><b>Atacar.</b> Elegí un territorio rival pegado a uno tuyo con 2 o más tropas. Cada ataque tira un dado por lado: si ganás, el defensor pierde 1 tropa; empate favorece al defensor.</p>
-      <p><b>Cuarteles.</b> Si el rival conquista el tuyo, perdés. Si conquistás el suyo, ganás inmediatamente.</p>
-      <p><b>Leer al rival.</b> Borde rojo punteado = territorio que podés atacar. Mirá dónde acumula tropas: esas fronteras son su amenaza inmediata. Al terminar su turno, abajo aparece un resumen de lo que hizo.</p>
-      <p><b>Controles.</b> Arrastrá con un dedo para mover el mapa; pellizcá para zoom. También podés usar + / −. El botón ⌖ vuelve a tu cuartel.</p>
+      <p><b>Tu primer objetivo.</b> Tocá PUESTOS para ubicar el más cercano. Reforzá tu frontera y expandite en esa dirección. Después disputá el puesto central. Vigilá tu cuartel.</p>
+      <p><b>3 acciones.</b> Expandir, reforzar, mover, atacar o fortificar gastan 1 acción. Podés repetirlas mientras tengas acciones y monedas. Terminar turno hace jugar al rival.</p>
+      <p><b>Expandir.</b> Seleccioná un neutral adyacente a tus tierras. El vecino propio con más tropas necesita al menos 2: transfiere 1 al nuevo sector.</p>
+      <p><b>Reforzar.</b> Seleccioná cualquier territorio propio. ¤2 por 1/2/3 tropas según la etapa. No hay precio variable ni mercado.</p>
+      <p><b>Mover.</b> Elegí un territorio propio con al menos 2 tropas, tocá Mover y luego un vecino propio. Transfiere 1 tropa y siempre deja al menos 1 atrás. Otro destino cancela.</p>
+      <p><b>Atacar.</b> Seleccioná un rival adyacente a un territorio propio con al menos 2 tropas. Ataca el vecino propio con más tropas; la selección muestra cuál. Cada lado tira 1d6, empate favorece al defensor: probabilidad de ganar la tirada 15/36 (42%). El perdedor pierde 1 tropa, salvo escudo defensor. Si el defensor llega a 0, conquistás con 1 tropa de tu origen.</p>
+      <p><b>Monedas.</b> Cada turno cobrás el mayor entre ¤2 y tus territorios divididos por 5, redondeado hacia abajo, más ¤2 por puesto. Los hitos son pagos únicos.</p>
+      <p><b>Amenaza.</b> El aviso cuenta tus sectores que el rival puede atacar con sus tropas actuales. No predice qué elegirá hacer. Blanco punteado = neutral conquistable; rojo punteado = rival atacable.</p>
+      <p><b>Controles.</b> Arrastrá para mover la cámara, pellizcá para zoom o usá +/−. ⌖ vuelve a tu cuartel. La cámara no consume acciones. Tu partida anterior se conserva y recibe los puestos.</p>
     </div>
-    <div class="changelog">
-      <small>NUEVO EN v0.3.0</small>
-      <p>El juego ahora gira alrededor de territorio, monedas y tropas. Se eliminaron mercado, ruinas y recursos secundarios. Hay 3 acciones claras por turno, combate con dados, refuerzos, movimiento de tropas y dos condiciones de victoria: tomar el cuartel rival o llegar al 60% del continente. Se conserva la estética, el mapa isométrico y los controles táctiles de v0.2.0.</p>
-    </div>
+  </dialog>
+
+  <dialog id="reportDialog">
+    <div class="dialog-head"><div><small>INTELIGENCIA</small><h2>Parte de guerra</h2></div><button id="closeReportBtn" aria-label="Cerrar parte">×</button></div>
+    <h3>Último turno rival</h3><p id="reportText" class="report-copy"></p>
+    <h3>Tus hitos · pago único</h3><p id="missionText" class="report-copy"></p>
   </dialog>
 
   <dialog id="victoryDialog">
@@ -119,6 +136,6 @@
     </div>
   </div>
 
-  <script type="module" src="./app.js?v=0.3.0"></script>
+  <script type="module" src="./app.js?v=0.4.0"></script>
 </body>
 </html>

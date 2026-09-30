@@ -163,3 +163,46 @@ test('capturing the enemy HQ ends the match immediately',()=>{
   assert.equal(run('state.winner'),'p');
   assert.equal(run('state.victoryReason'),'tomaste el cuartel rival');
 });
+
+test('campaign stages affect both sides and keep the same reinforcement price',()=>{
+  const {run}=setup();
+  for(const [turn,size] of [[1,1],[7,1],[8,2],[15,2],[16,3]]) {
+    run(`state.turn=${turn};state.ap=3;state.resources.money=20;selected=state.playerCapital`);
+    const before=run('state.cells[selected].troops');run('act("reinforce")');
+    assert.equal(run('state.cells[selected].troops'),before+size);
+    assert.equal(run('state.resources.money'),18);
+  }
+});
+test('outpost income, one-time rewards and consecutive control victory',()=>{
+  const {run}=setup();
+  const before=run('incomeFor("p")');
+  run('for(const i of POSTS.slice(0,2)){state.cells[i].owner="p";state.cells[i].troops=1;}checkVictory()');
+  assert.ok(run('incomeFor("p")')>=before+4);
+  assert.equal(run('state.resources.money'),24);
+  run('checkVictory();updateHold();updateHold()');
+  assert.equal(run('state.resources.money'),24);assert.equal(run('state.winner'),null);
+  run('state.cells[POSTS[1]].owner="ai";checkVictory()');assert.equal(run('state.hold.p'),0);
+  run('state.cells[POSTS[1]].owner="p";updateHold();updateHold();updateHold()');assert.equal(run('state.winner'),'p');
+});
+test('fortification absorbs exactly one successful attack with no troop loss',()=>{
+  const {run}=setup();
+  run('selected=state.playerCapital;act("fortify");const enemy=neighbors(selected)[0];state.cells[enemy].owner="ai";state.cells[enemy].troops=4;');
+  assert.equal(run('state.resources.money'),8);assert.equal(run('canAction("fortify")'),false);
+  run('const originalRandom=Math.random;let roll=0;Math.random=()=>roll++%2===0?.99:0;resolveCombat("ai",state.playerCapital);Math.random=originalRandom;');
+  assert.equal(run('state.cells[state.playerCapital].troops'),6);
+  assert.equal(run('state.cells[state.playerCapital].fort'),false);
+});
+test('load preserves campaign progress and migrates old saves without wiping troops',()=>{
+  const {run}=setup();
+  run('initializeCampaign();state.hold.p=2;state.milestones.p=[0];state.cells[state.playerCapital].fort=true;state.cells[state.playerCapital].troops=12;let saved=JSON.stringify(state);localStorage.getItem=()=>saved;load()');
+  assert.equal(run('state.hold.p'),2);assert.equal(run('state.cells[state.playerCapital].fort'),true);
+  assert.equal(run('state.cells[state.playerCapital].troops'),12);
+  run('delete state.hold;delete state.milestones;delete state.report;saved=JSON.stringify(state);load()');
+  assert.equal(run('state.hold.p'),0);assert.equal(run('POSTS.every(i=>state.cells[i].building==="outpost")'),true);
+});
+test('pending troop movement cannot spend an exhausted action or act after victory',()=>{
+  const {run}=setup();
+  run('selected=state.playerCapital;beginMove();state.ap=0');
+  assert.equal(run('finishMove(neighbors(state.playerCapital)[0])'),false);
+  assert.equal(run('state.cells[state.playerCapital].troops'),6);
+});
