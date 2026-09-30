@@ -1,11 +1,14 @@
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const SAVE_KEY = "guerra-minima-save-v1";
 const W = 40;
 const H = 28;
 const TW = 48;
 const TH = 24;
 const MAX_AP = 3;
-const MAX_TRADES = 3;
+const REINFORCE_COST = 2;
+const TERRITORY_WIN = 0.60;
+const START_MONEY = 12;
+const CAPITAL_TROOPS = 6;
 
 const COUNTRIES = [
 ["Afganistán","AF"],["Albania","AL"],["Alemania","DE"],["Andorra","AD"],["Angola","AO"],["Antigua y Barbuda","AG"],["Arabia Saudita","SA"],["Argelia","DZ"],["Argentina","AR"],["Armenia","AM"],["Australia","AU"],["Austria","AT"],["Azerbaiyán","AZ"],["Bahamas","BS"],["Bangladés","BD"],["Barbados","BB"],["Baréin","BH"],["Bélgica","BE"],["Belice","BZ"],["Benín","BJ"],["Bielorrusia","BY"],["Birmania","MM"],["Bolivia","BO"],["Bosnia y Herzegovina","BA"],["Botsuana","BW"],["Brasil","BR"],["Brunéi","BN"],["Bulgaria","BG"],["Burkina Faso","BF"],["Burundi","BI"],["Bután","BT"],["Cabo Verde","CV"],["Camboya","KH"],["Camerún","CM"],["Canadá","CA"],["Catar","QA"],["Chad","TD"],["Chile","CL"],["China","CN"],["Chipre","CY"],["Colombia","CO"],["Comoras","KM"],["Corea del Norte","KP"],["Corea del Sur","KR"],["Costa de Marfil","CI"],["Costa Rica","CR"],["Croacia","HR"],["Cuba","CU"],["Dinamarca","DK"],["Dominica","DM"],["Ecuador","EC"],["Egipto","EG"],["El Salvador","SV"],["Emiratos Árabes Unidos","AE"],["Eritrea","ER"],["Eslovaquia","SK"],["Eslovenia","SI"],["España","ES"],["Estados Unidos","US"],["Estonia","EE"],["Esuatini","SZ"],["Etiopía","ET"],["Filipinas","PH"],["Finlandia","FI"],["Fiyi","FJ"],["Francia","FR"],["Gabón","GA"],["Gambia","GM"],["Georgia","GE"],["Ghana","GH"],["Granada","GD"],["Grecia","GR"],["Guatemala","GT"],["Guinea","GN"],["Guinea-Bisáu","GW"],["Guinea Ecuatorial","GQ"],["Guyana","GY"],["Haití","HT"],["Honduras","HN"],["Hungría","HU"],["India","IN"],["Indonesia","ID"],["Irak","IQ"],["Irán","IR"],["Irlanda","IE"],["Islandia","IS"],["Islas Marshall","MH"],["Islas Salomón","SB"],["Israel","IL"],["Italia","IT"],["Jamaica","JM"],["Japón","JP"],["Jordania","JO"],["Kazajistán","KZ"],["Kenia","KE"],["Kirguistán","KG"],["Kiribati","KI"],["Kuwait","KW"],["Laos","LA"],["Lesoto","LS"],["Letonia","LV"],["Líbano","LB"],["Liberia","LR"],["Libia","LY"],["Liechtenstein","LI"],["Lituania","LT"],["Luxemburgo","LU"],["Macedonia del Norte","MK"],["Madagascar","MG"],["Malasia","MY"],["Malaui","MW"],["Maldivas","MV"],["Malí","ML"],["Malta","MT"],["Marruecos","MA"],["Mauricio","MU"],["Mauritania","MR"],["México","MX"],["Micronesia","FM"],["Moldavia","MD"],["Mónaco","MC"],["Mongolia","MN"],["Montenegro","ME"],["Mozambique","MZ"],["Namibia","NA"],["Nauru","NR"],["Nepal","NP"],["Nicaragua","NI"],["Níger","NE"],["Nigeria","NG"],["Noruega","NO"],["Nueva Zelanda","NZ"],["Omán","OM"],["Países Bajos","NL"],["Pakistán","PK"],["Palaos","PW"],["Palestina","PS"],["Panamá","PA"],["Papúa Nueva Guinea","PG"],["Paraguay","PY"],["Perú","PE"],["Polonia","PL"],["Portugal","PT"],["Reino Unido","GB"],["República Centroafricana","CF"],["República Checa","CZ"],["República del Congo","CG"],["República Democrática del Congo","CD"],["República Dominicana","DO"],["Ruanda","RW"],["Rumania","RO"],["Rusia","RU"],["Samoa","WS"],["San Cristóbal y Nieves","KN"],["San Marino","SM"],["San Vicente y las Granadinas","VC"],["Santa Lucía","LC"],["Santo Tomé y Príncipe","ST"],["Senegal","SN"],["Serbia","RS"],["Seychelles","SC"],["Sierra Leona","SL"],["Singapur","SG"],["Siria","SY"],["Somalia","SO"],["Sri Lanka","LK"],["Sudáfrica","ZA"],["Sudán","SD"],["Sudán del Sur","SS"],["Suecia","SE"],["Suiza","CH"],["Surinam","SR"],["Tailandia","TH"],["Tanzania","TZ"],["Tayikistán","TJ"],["Timor Oriental","TL"],["Togo","TG"],["Tonga","TO"],["Trinidad y Tobago","TT"],["Túnez","TN"],["Turkmenistán","TM"],["Turquía","TR"],["Tuvalu","TV"],["Ucrania","UA"],["Uganda","UG"],["Uruguay","UY"],["Uzbekistán","UZ"],["Vanuatu","VU"],["Vaticano","VA"],["Venezuela","VE"],["Vietnam","VN"],["Yemen","YE"],["Yibuti","DJ"],["Zambia","ZM"],["Zimbabue","ZW"]
@@ -18,15 +21,6 @@ const TERRAIN_LABELS = {
   forest:"Bosque",
   hills:"Colinas",
   scrub:"Matorral"
-};
-
-const PRICES = { food:2, wood:3, stone:4, metal:6 };
-const RES_LABELS = {
-  food:["🌾","Comida"],
-  wood:["🪵","Madera"],
-  stone:["🪨","Piedra"],
-  metal:["⛓","Metal"],
-  money:["¤","Dinero"]
 };
 
 const el = (id) => document.getElementById(id);
@@ -49,6 +43,7 @@ let dragging = false;
 let moved = false;
 let pointerStart = null;
 let cameraStart = null;
+let moveSource = null;
 
 let toastTimer = null;
 
@@ -138,33 +133,26 @@ function newState() {
   if (eIndex === pIndex) eIndex = (eIndex + 1) % COUNTRIES.length;
   const playerCapital = idx(6, Math.floor(H/2));
   const enemyCapital = idx(W-7, Math.floor(H/2));
-  const cells = new Array(W*H).fill(null).map(() => ({ owner:null, building:null, ruin:false, explored:false }));
+  const cells = new Array(W*H).fill(null).map(() => ({ owner:null, building:null, troops:0, ruin:false, explored:false }));
 
   function claimAround(center, owner) {
     const p = xy(center);
     for (let y=p.y-2; y<=p.y+2; y++) for (let x=p.x-2; x<=p.x+2; x++) {
       if (!inside(x,y)) continue;
       const i = idx(x,y);
-      if (isLand(i) && Math.abs(x-p.x)+Math.abs(y-p.y) <= 3) cells[i].owner = owner;
+      if (isLand(i) && Math.abs(x-p.x)+Math.abs(y-p.y) <= 3) {
+        cells[i].owner = owner;
+        cells[i].troops = 1;
+      }
     }
   }
+
   claimAround(playerCapital, "p");
   claimAround(enemyCapital, "ai");
   cells[playerCapital].building = "capital";
+  cells[playerCapital].troops = CAPITAL_TROOPS;
   cells[enemyCapital].building = "capital";
-
-  let ruins = 0;
-  let guard = 0;
-  while (ruins < 11 && guard < 1000) {
-    guard++;
-    const x = 10 + Math.floor(r()*(W-20));
-    const y = 3 + Math.floor(r()*(H-6));
-    const i = idx(x,y);
-    if (isLand(i) && !cells[i].owner && !cells[i].ruin) {
-      cells[i].ruin = true;
-      ruins++;
-    }
-  }
+  cells[enemyCapital].troops = CAPITAL_TROOPS;
 
   return {
     schema:1,
@@ -177,12 +165,13 @@ function newState() {
     enemyCapital,
     cells,
     ap:MAX_AP,
-    trades:0,
     day:1,
     turn:1,
-    resources:{ food:12, wood:10, stone:8, metal:3, money:22 },
-    aiResources:{ food:12, wood:10, stone:8, metal:3, money:22 },
-    log:["El continente fue reclamado por dos países."]
+    resources:{ money:START_MONEY },
+    aiResources:{ money:START_MONEY },
+    winner:null,
+    victoryReason:null,
+    log:["Objetivo: tomá el cuartel rival o controlá el 60% del continente."]
   };
 }
 
@@ -198,6 +187,20 @@ function load() {
     if (!parsed || parsed.schema !== 1 || !Array.isArray(parsed.cells) || parsed.cells.length !== W*H) return false;
     state = parsed;
     terrain = generateTerrain(state.seed);
+    state.version = VERSION;
+    state.resources = { money:Number(state.resources?.money) || START_MONEY };
+    state.aiResources = { money:Number(state.aiResources?.money) || START_MONEY };
+    state.winner = state.winner || null;
+    state.victoryReason = state.victoryReason || null;
+    state.cells.forEach((c,i) => {
+      c.ruin = false;
+      c.explored = false;
+      if (c.building && c.building !== "capital") c.building = null;
+      if (c.owner && (!Number.isFinite(c.troops) || c.troops < 1)) c.troops = i === state.playerCapital || i === state.enemyCapital ? CAPITAL_TROOPS : 1;
+      if (!c.owner) c.troops = 0;
+    });
+    state.cells[state.playerCapital].building = "capital";
+    state.cells[state.enemyCapital].building = "capital";
     return true;
   } catch {
     return false;
@@ -207,6 +210,7 @@ function load() {
 function resetGame() {
   state = newState();
   selected = null;
+  moveSource = null;
   resetGesture();
   zoom = 1;
   centerOnPlayer();
@@ -214,6 +218,36 @@ function resetGame() {
   syncUI();
   closeDialog("menu");
   toast("Nuevo continente generado.");
+}
+
+function territoryCount(owner) {
+  return state.cells.reduce((n,c,i) => n + (isLand(i) && c.owner === owner ? 1 : 0), 0);
+}
+
+function landCount() {
+  let total = 0;
+  for (let i=0; i<state.cells.length; i++) if (isLand(i)) total++;
+  return total;
+}
+
+function territoryShare(owner) {
+  const total = landCount();
+  return total ? territoryCount(owner) / total : 0;
+}
+
+function troopTotal(owner) {
+  return state.cells.reduce((n,c) => n + (c.owner === owner ? (c.troops || 0) : 0), 0);
+}
+
+function incomeFor(owner) {
+  return Math.max(2, Math.floor(territoryCount(owner) / 5));
+}
+
+function strongestAdjacent(i, owner) {
+  const candidates = neighbors(i).filter((n) => state.cells[n].owner === owner && state.cells[n].troops > 1);
+  if (!candidates.length) return null;
+  candidates.sort((a,b) => state.cells[b].troops - state.cells[a].troops);
+  return candidates[0];
 }
 
 function syncUI() {
@@ -227,12 +261,13 @@ function syncUI() {
   el("versionLabel").textContent = "v" + VERSION;
   el("lastEvent").textContent = state.log[0] || "Elegí hasta 3 acciones.";
 
-  el("resources").innerHTML = ["food","wood","stone","metal","money"].map((key) => {
-    return '<div class="resource"><span>' + RES_LABELS[key][0] + '</span><b>' + state.resources[key] + '</b></div>';
-  }).join("");
+  const pct = Math.round(territoryShare("p") * 100);
+  el("resources").innerHTML =
+    '<div class="resource"><span>¤</span><b>' + state.resources.money + '</b><small>monedas</small></div>' +
+    '<div class="resource"><span>♟</span><b>' + troopTotal("p") + '</b><small>tropas</small></div>' +
+    '<div class="resource"><span>⚑</span><b>' + pct + '%</b><small>territorio · meta 60%</small></div>';
 
   updateSelectionUI();
-  renderMarket();
 }
 
 function ownerLabel(owner) {
@@ -243,23 +278,24 @@ function ownerLabel(owner) {
 
 function updateSelectionUI() {
   if (selected == null) {
-    el("selectionTitle").textContent = "Tocá una zona del mapa";
-    el("selectionMeta").textContent = "El mundo sigue vivo mientras decidís.";
+    el("selectionTitle").textContent = moveSource == null ? "Tocá una zona del mapa" : "Elegí un territorio vecino";
+    el("selectionMeta").textContent = moveSource == null ? "Los números sobre el mapa son tropas." : "Mover transfiere 1 tropa y gasta 1 acción.";
   } else {
     const c = state.cells[selected];
     const pos = xy(selected);
     let title = TERRAIN_LABELS[terrain[selected]];
-    if (c.building === "capital") title = "Capital de " + ownerLabel(c.owner);
-    else if (c.building === "village") title = "Asentamiento de " + ownerLabel(c.owner);
-    else if (c.building === "outpost") title = "Puesto fronterizo de " + ownerLabel(c.owner);
-    else if (c.ruin && !c.explored) title = "Ruinas antiguas";
+    if (c.building === "capital") title = "Cuartel de " + ownerLabel(c.owner);
     const bits = [ownerLabel(c.owner), "sector " + (pos.x+1) + "." + (pos.y+1)];
+    if (c.owner) bits.push((c.troops || 0) + ((c.troops || 0) === 1 ? " tropa" : " tropas"));
     if (c.owner === null && isLand(selected)) {
-      bits.push(adjacentOwner(selected,"p") ? "DENTRO DE TU ALCANCE" : "fuera de alcance");
+      bits.push(strongestAdjacent(selected,"p") != null ? "PODÉS EXPANDIR" : "necesitás 2 tropas en un vecino");
     }
-    if (c.owner === "ai" && adjacentOwner(selected,"p")) bits.push("frontera rival alcanzable");
-    if (c.ruin && !c.explored) bits.push("explorar da recursos");
-    if (c.ruin && c.explored) bits.push("ruinas exploradas");
+    if (c.owner === "ai" && adjacentOwner(selected,"p")) {
+      const src = strongestAdjacent(selected,"p");
+      bits.push(src != null ? "PODÉS ATACAR" : "frontera rival · necesitás 2 tropas");
+    }
+    if (c.owner === "ai" && c.building === "capital") bits.push("tomarlo gana la partida");
+    if (c.owner === "p" && selected === state.playerCapital) bits.push("protegé este cuartel");
     el("selectionTitle").textContent = title;
     el("selectionMeta").textContent = bits.join(" · ");
   }
@@ -269,23 +305,14 @@ function updateSelectionUI() {
   });
 }
 
-function enough(cost) {
-  return Object.entries(cost).every(([k,v]) => state.resources[k] >= v);
-}
-
 function canAction(action) {
-  if (state.ap <= 0 || selected == null) return false;
+  if (state.winner || state.ap <= 0 || selected == null) return false;
   const c = state.cells[selected];
-  if (action === "expand") return isLand(selected) && c.owner === null && adjacentOwner(selected,"p") && enough({food:2});
-  if (action === "build") return c.owner === "p" && !c.building && enough({wood:6,stone:3,money:4});
-  if (action === "harvest") return c.owner === "p";
-  if (action === "explore") return c.ruin && !c.explored && (c.owner === "p" || (c.owner === null && adjacentOwner(selected,"p")));
-  if (action === "attack") return c.owner === "ai" && adjacentOwner(selected,"p") && c.building !== "capital" && enough({food:3,metal:1});
+  if (action === "expand") return isLand(selected) && c.owner === null && strongestAdjacent(selected,"p") != null;
+  if (action === "reinforce") return c.owner === "p" && state.resources.money >= REINFORCE_COST;
+  if (action === "move") return c.owner === "p" && c.troops > 1;
+  if (action === "attack") return c.owner === "ai" && strongestAdjacent(selected,"p") != null;
   return false;
-}
-
-function spend(cost) {
-  Object.entries(cost).forEach(([k,v]) => state.resources[k] -= v);
 }
 
 function addLog(text) {
@@ -298,153 +325,239 @@ function useAction() {
   state.ap = Math.max(0, state.ap - 1);
 }
 
+function setWinner(owner, reason) {
+  if (state.winner) return;
+  state.winner = owner;
+  state.victoryReason = reason;
+  const who = owner === "p" ? "Ganaste" : "Perdiste";
+  addLog(who + ": " + reason + ".");
+  save();
+  syncUI();
+  showVictory();
+}
+
+function checkVictory() {
+  if (state.winner) return state.winner;
+  if (state.cells[state.enemyCapital].owner === "p") {
+    setWinner("p","tomaste el cuartel rival");
+    return "p";
+  }
+  if (state.cells[state.playerCapital].owner === "ai") {
+    setWinner("ai","el rival tomó tu cuartel");
+    return "ai";
+  }
+  if (territoryShare("p") >= TERRITORY_WIN) {
+    setWinner("p","controlás al menos el 60% del continente");
+    return "p";
+  }
+  if (territoryShare("ai") >= TERRITORY_WIN) {
+    setWinner("ai","el rival controla al menos el 60% del continente");
+    return "ai";
+  }
+  return null;
+}
+
+function showVictory() {
+  if (!state?.winner) return;
+  const title = state.winner === "p" ? "VICTORIA" : "DERROTA";
+  el("victoryTitle").textContent = title;
+  el("victoryText").textContent = state.victoryReason + ".";
+  if (!el("victoryDialog").open) el("victoryDialog").showModal();
+}
+
+function resolveCombat(attacker, target) {
+  const defender = attacker === "p" ? "ai" : "p";
+  const source = strongestAdjacent(target, attacker);
+  if (source == null || state.cells[target].owner !== defender) return null;
+
+  const attackRoll = 1 + Math.floor(Math.random()*6);
+  const defendRoll = 1 + Math.floor(Math.random()*6);
+  const sourceCell = state.cells[source];
+  const targetCell = state.cells[target];
+  const targetWasCapital = targetCell.building === "capital";
+  let message = "";
+
+  if (attackRoll > defendRoll) {
+    targetCell.troops = Math.max(0, targetCell.troops - 1);
+    if (targetCell.troops === 0) {
+      sourceCell.troops -= 1;
+      targetCell.owner = attacker;
+      targetCell.troops = 1;
+      message = "conquistó " + (targetWasCapital ? "el cuartel" : "un sector") + " (" + attackRoll + "-" + defendRoll + ")";
+    } else {
+      message = "hizo perder 1 tropa al defensor (" + attackRoll + "-" + defendRoll + ")";
+    }
+  } else {
+    sourceCell.troops -= 1;
+    message = "perdió 1 tropa atacando (" + attackRoll + "-" + defendRoll + ")";
+  }
+  return {source,target,message,attackRoll,defendRoll};
+}
+
+function beginMove() {
+  if (!canAction("move")) return;
+  moveSource = selected;
+  updateSelectionUI();
+  toast("Elegí un territorio propio vecino para mover 1 tropa.");
+}
+
+function finishMove(target) {
+  if (moveSource == null) return false;
+  const source = moveSource;
+  moveSource = null;
+  if (target == null || target === source || !neighbors(source).includes(target) || state.cells[target].owner !== "p" || state.cells[source].troops <= 1) {
+    toast("Movimiento cancelado: elegí un territorio propio vecino.");
+    return false;
+  }
+  state.cells[source].troops -= 1;
+  state.cells[target].troops += 1;
+  selected = target;
+  useAction();
+  addLog("Moviste 1 tropa a un territorio vecino.");
+  checkVictory();
+  save();
+  syncUI();
+  return true;
+}
+
 function act(action) {
+  if (action === "move") {
+    beginMove();
+    return;
+  }
   if (!canAction(action)) {
     toast("Esa acción no está disponible en la zona seleccionada.");
     return;
   }
+
   const c = state.cells[selected];
   const t = terrain[selected];
 
   if (action === "expand") {
-    spend({food:2});
+    const source = strongestAdjacent(selected,"p");
+    state.cells[source].troops -= 1;
     c.owner = "p";
-    addLog("Tu frontera avanzó hacia " + TERRAIN_LABELS[t].toLowerCase() + ".");
+    c.troops = 1;
+    addLog("Expandiste la frontera hacia " + TERRAIN_LABELS[t].toLowerCase() + ".");
   }
 
-  if (action === "build") {
-    spend({wood:6,stone:3,money:4});
-    c.building = adjacentOwner(selected,"ai") ? "outpost" : "village";
-    addLog(c.building === "outpost" ? "Levantaste un puesto fronterizo." : "Fundaste un pequeño asentamiento.");
-  }
-
-  if (action === "harvest") {
-    const gain = t === "forest" ? {wood:5,food:1} :
-      t === "hills" ? {stone:4,metal:1} :
-      t === "valley" ? {food:5,wood:1} :
-      t === "scrub" ? {wood:2,stone:2} : {food:3,wood:1};
-    Object.entries(gain).forEach(([k,v]) => state.resources[k] += v);
-    addLog("Recolectaste recursos de esta zona.");
-  }
-
-  if (action === "explore") {
-    c.explored = true;
-    if (!c.owner) c.owner = "p";
-    const r = mulberry32((state.seed ^ selected ^ state.turn * 7919) >>> 0);
-    const bonus = 5 + Math.floor(r()*7);
-    state.resources.money += bonus;
-    if (r() > .5) state.resources.metal += 2; else state.resources.stone += 3;
-    addLog("Exploraste las ruinas: encontraste bienes por ¤" + bonus + ".");
+  if (action === "reinforce") {
+    state.resources.money -= REINFORCE_COST;
+    c.troops += 1;
+    addLog("Reforzaste el sector: +1 tropa por ¤" + REINFORCE_COST + ".");
   }
 
   if (action === "attack") {
-    spend({food:3,metal:1});
-    const chance = c.building ? .48 : .68;
-    if (Math.random() < chance) {
-      c.owner = "p";
-      if (c.building === "village") c.building = "outpost";
-      addLog("La intervención avanzó: el sector cambió de control.");
-    } else {
-      addLog("La intervención fracasó. La frontera no se movió.");
-    }
+    const result = resolveCombat("p",selected);
+    addLog(result ? "Ataque: " + result.message + "." : "No hay tropas suficientes para atacar.");
   }
 
   useAction();
+  checkVictory();
   save();
   syncUI();
 }
 
-function renderMarket() {
-  const rows = Object.keys(PRICES).map((key) => {
-    const label = RES_LABELS[key][1];
-    const icon = RES_LABELS[key][0];
-    const buy = PRICES[key];
-    const sell = Math.max(1, Math.floor(buy*.6));
-    return '<div class="market-row"><div><strong>' + icon + ' ' + label + '</strong><small>Tenés ' + state.resources[key] + ' · compra ¤' + buy + ' · venta ¤' + sell + '</small></div>' +
-      '<button data-buy="' + key + '">Comprar</button><button data-sell="' + key + '">Vender</button></div>';
-  }).join("");
-  el("marketRows").innerHTML = rows;
-  el("tradeCount").textContent = state.trades + " / " + MAX_TRADES + " operaciones";
-  el("marketRows").querySelectorAll("button").forEach((b) => {
-    const key = b.dataset.buy || b.dataset.sell;
-    const buy = !!b.dataset.buy;
-    b.disabled = state.trades >= MAX_TRADES || (buy ? state.resources.money < PRICES[key] : state.resources[key] <= 0);
-    b.addEventListener("click", () => trade(key,buy));
-  });
+function grantIncome(owner) {
+  const gain = incomeFor(owner);
+  if (owner === "p") state.resources.money += gain;
+  else state.aiResources.money += gain;
+  return gain;
 }
 
-function trade(key, buy) {
-  if (state.trades >= MAX_TRADES) return;
-  const price = PRICES[key];
-  if (buy) {
-    if (state.resources.money < price) return;
-    state.resources.money -= price;
-    state.resources[key] += 1;
-    addLog("Compraste 1 " + RES_LABELS[key][1].toLowerCase() + ".");
-  } else {
-    if (state.resources[key] <= 0) return;
-    state.resources[key] -= 1;
-    state.resources.money += Math.max(1,Math.floor(price*.6));
-    addLog("Vendiste 1 " + RES_LABELS[key][1].toLowerCase() + ".");
+function aiMoveTowardPlayer() {
+  const options = [];
+  for (let i=0; i<state.cells.length; i++) {
+    const c = state.cells[i];
+    if (c.owner !== "ai" || c.troops <= 1) continue;
+    const from = xy(i);
+    const fromDist = Math.abs(from.x-xy(state.playerCapital).x) + Math.abs(from.y-xy(state.playerCapital).y);
+    for (const n of neighbors(i)) {
+      if (state.cells[n].owner !== "ai") continue;
+      const to = xy(n);
+      const toDist = Math.abs(to.x-xy(state.playerCapital).x) + Math.abs(to.y-xy(state.playerCapital).y);
+      if (toDist < fromDist) options.push([i,n,toDist]);
+    }
   }
-  state.trades++;
-  save();
-  syncUI();
+  if (!options.length) return false;
+  options.sort((a,b) => a[2]-b[2]);
+  const [from,to] = options[Math.floor(Math.random()*Math.min(5,options.length))];
+  state.cells[from].troops -= 1;
+  state.cells[to].troops += 1;
+  return true;
 }
 
 function aiTurn() {
-  let note = [];
-  for (let move=0; move<MAX_AP; move++) {
+  const note = [];
+  for (let move=0; move<MAX_AP && !state.winner; move++) {
     const attackables = [];
     const expandables = [];
-    const buildables = [];
+    const reinforceables = [];
     for (let i=0; i<state.cells.length; i++) {
       const c = state.cells[i];
       if (!isLand(i)) continue;
-      if (c.owner === "p" && c.building !== "capital" && adjacentOwner(i,"ai")) attackables.push(i);
-      if (c.owner === null && adjacentOwner(i,"ai")) expandables.push(i);
-      if (c.owner === "ai" && !c.building) buildables.push(i);
+      if (c.owner === "p" && strongestAdjacent(i,"ai") != null) attackables.push(i);
+      if (c.owner === null && strongestAdjacent(i,"ai") != null) expandables.push(i);
+      if (c.owner === "ai") reinforceables.push(i);
     }
 
-    if (attackables.length && Math.random() < .42) {
-      const i = attackables[Math.floor(Math.random()*attackables.length)];
-      if (Math.random() < .58) {
-        state.cells[i].owner = "ai";
-        if (state.cells[i].building === "village") state.cells[i].building = "outpost";
-        note.push("avanzó sobre tu frontera");
-      } else note.push("intentó intervenir una frontera");
+    attackables.sort((a,b) => (a === state.playerCapital ? -1 : b === state.playerCapital ? 1 : state.cells[a].troops-state.cells[b].troops));
+    if (attackables.length && (attackables[0] === state.playerCapital || Math.random() < .55)) {
+      const i = attackables[0];
+      const result = resolveCombat("ai",i);
+      if (result) note.push("atacó: " + result.message);
+      checkVictory();
       continue;
     }
 
-    if (expandables.length && Math.random() < .78) {
+    if (expandables.length && Math.random() < .62) {
       expandables.sort((a,b) => xy(a).x - xy(b).x);
-      const pool = expandables.slice(0,Math.min(7,expandables.length));
-      const i = pool[Math.floor(Math.random()*pool.length)];
+      const i = expandables[Math.floor(Math.random()*Math.min(8,expandables.length))];
+      const source = strongestAdjacent(i,"ai");
+      state.cells[source].troops -= 1;
       state.cells[i].owner = "ai";
-      note.push("expandió territorio");
+      state.cells[i].troops = 1;
+      note.push("expandió su frontera");
+      checkVictory();
       continue;
     }
 
-    if (buildables.length) {
-      const i = buildables[Math.floor(Math.random()*buildables.length)];
-      state.cells[i].building = adjacentOwner(i,"p") ? "outpost" : "village";
-      note.push("levantó un asentamiento");
+    if (state.aiResources.money >= REINFORCE_COST && reinforceables.length) {
+      const frontier = reinforceables.filter((i) => neighbors(i).some((n) => state.cells[n].owner !== "ai" && isLand(n)));
+      const pool = frontier.length ? frontier : reinforceables;
+      pool.sort((a,b) => state.cells[a].troops - state.cells[b].troops);
+      const i = pool[0];
+      state.aiResources.money -= REINFORCE_COST;
+      state.cells[i].troops += 1;
+      note.push("reforzó su frontera");
+      continue;
     }
+
+    if (aiMoveTowardPlayer()) note.push("movió tropas hacia vos");
+    else note.push("consolidó posiciones");
   }
   return note;
 }
 
 function endTurn() {
+  if (state.winner) return showVictory();
+  moveSource = null;
+  const aiIncome = grantIncome("ai");
   const note = aiTurn();
+  if (state.winner) {
+    save();
+    syncUI();
+    return;
+  }
   state.turn++;
   state.day++;
   state.ap = MAX_AP;
-  state.trades = 0;
-  const summary = note.length ? state.enemyCountry[0] + " " + note.slice(0,2).join(" y ") + "." : state.enemyCountry[0] + " consolidó su territorio.";
-  addLog(summary + " Es tu turno.");
+  const playerIncome = grantIncome("p");
+  const summary = note.length ? "Rival: " + note.slice(0,3).join(" · ") + "." : "Rival: consolidó su territorio.";
+  addLog(summary + " Vos recibís ¤" + playerIncome + " por tus territorios.");
   save();
   syncUI();
-  toast("Es tu turno contra " + state.enemyCountry[0] + ".");
+  toast("Es tu turno. Ingreso: ¤" + playerIncome + ".");
 }
 
 function terrainColor(t, x, y) {
@@ -579,6 +692,25 @@ function drawAgents(x,y,owner,time,i) {
     ctx.restore();
   }
 }
+function drawTroops(p,c) {
+  if (!c.owner || !c.troops) return;
+  const x = p.x + 11*zoom;
+  const y = p.y + 9*zoom;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x,y,Math.max(6,7*zoom),0,Math.PI*2);
+  ctx.fillStyle = "#0b0c09";
+  ctx.fill();
+  ctx.strokeStyle = c.owner === "p" ? "#fffef2" : "#ff7965";
+  ctx.lineWidth = Math.max(1,1.5*zoom);
+  ctx.stroke();
+  ctx.fillStyle = c.owner === "p" ? "#fffef2" : "#ff7965";
+  ctx.font = `900 ${Math.max(8,9*zoom)}px system-ui,sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(String(c.troops),x,y+.5);
+  ctx.restore();
+}
 function drawHills(p) {
   ctx.save();ctx.translate(p.x,p.y+13*zoom);ctx.scale(zoom,zoom);ctx.strokeStyle="#35230b";ctx.lineWidth=.8;
   inkShape([[-12,0],[-9,-5],[-5,-12],[-2,-14],[1,-12],[6,0]],"#ffb32a");
@@ -619,9 +751,9 @@ function render(time=0) {
           const emblem=c.owner === "p" ? "+" : "×";
           ctx.strokeText(emblem,p.x,p.y+21*zoom);ctx.fillText(emblem,p.x,p.y+21*zoom);ctx.restore();
         }
-        if (state.ap > 0 && isLand(i) && c.owner === null && adjacentOwner(i,"p")) {
+        if (state.ap > 0 && isLand(i) && c.owner === null && strongestAdjacent(i,"p") != null) {
           outlineDiamond(p,"#fffef2",Math.max(1.5,2.2*zoom),true);
-        } else if (state.ap > 0 && c.owner === "ai" && c.building !== "capital" && adjacentOwner(i,"p")) {
+        } else if (state.ap > 0 && c.owner === "ai" && strongestAdjacent(i,"p") != null) {
           outlineDiamond(p,"#ff695b",Math.max(1.3,2*zoom),true);
         }
 
@@ -635,11 +767,11 @@ function render(time=0) {
           if (n>.35) drawTree(p.x+5*zoom,p.y+8*zoom,.7);
         }
         if (t === "hills") drawHills(p);
-        if (c.ruin) drawRuin(p.x,p.y+10*zoom,c.explored);
         if (c.building) {
           drawBuilding(p.x,p.y+11*zoom,c.building,c.owner,time,i);
           drawAgents(p.x,p.y+14*zoom,c.owner,time,i);
         }
+        drawTroops(p,c);
 
 
       }
@@ -701,7 +833,14 @@ function pickTile(sx,sy) {
 
 function selectAt(clientX,clientY) {
   const p = canvasPoint(clientX,clientY);
-  selected = pickTile(p.x,p.y);
+  const picked = pickTile(p.x,p.y);
+  if (moveSource != null) {
+    if (finishMove(picked)) {
+      el("mapHint").style.opacity = "0";
+      return;
+    }
+  }
+  selected = picked;
   updateSelectionUI();
   el("mapHint").style.opacity = "0";
 }
@@ -745,7 +884,7 @@ function toast(text) {
 }
 
 function closeDialog(which) {
-  const d = which === "market" ? el("marketDialog") : which === "help" ? el("helpDialog") : el("menuDialog");
+  const d = which === "help" ? el("helpDialog") : which === "victory" ? el("victoryDialog") : el("menuDialog");
   if (d.open) d.close();
 }
 
@@ -808,7 +947,6 @@ function bindEvents() {
 
   document.querySelectorAll(".actions button").forEach((b) => b.addEventListener("click",() => act(b.dataset.action)));
   el("endTurnBtn").addEventListener("click",endTurn);
-  el("marketBtn").addEventListener("click",() => { renderMarket(); el("marketDialog").showModal(); });
   el("menuBtn").addEventListener("click",() => el("menuDialog").showModal());
   el("helpBtn").addEventListener("click",() => { closeDialog("menu"); el("helpDialog").showModal(); });
   el("zoomInBtn").addEventListener("click",() => setZoom(zoom+0.15));
@@ -856,6 +994,7 @@ async function boot() {
   centerOnPlayer();
   bindEvents();
   requestAnimationFrame(render);
+  if (state.winner) showVictory();
 
   const guideKey = "guerra-minima-guide-version";
   if (localStorage.getItem(guideKey) !== VERSION) {
