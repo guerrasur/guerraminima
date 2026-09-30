@@ -542,9 +542,7 @@ function finishMove(target) {
   const input = el("moveAmount");
   input.max = String(max);
   input.value = String(Math.min(max, Math.max(1, Math.ceil(max/2))));
-  el("movePreview").textContent = sectorLabel(source) + " → " + sectorLabel(target) +
-    " · quedan " + (state.cells[source].troops - Number(input.value)) +
-    " · llegan " + (state.cells[target].troops + Number(input.value));
+  refreshMovePreview();
   el("moveDialog").showModal();
   return true;
 }
