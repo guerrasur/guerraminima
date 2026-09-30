@@ -2,6 +2,35 @@
 
 Prototipo mobile-first de estrategia por turnos. Funciona enteramente en el navegador, guarda la partida en `localStorage` y se publica como sitio estático en GitHub Pages.
 
+## NEXO del juego — regla de producto
+
+**Guerra Mínima es un juego online de estrategia para jugar con amigos sin presión.**
+
+Este principio está por encima de cualquier feature individual y debe usarse para evaluar futuras actualizaciones:
+
+- no hay temporizadores que apuren al jugador ni cierre automático de turno;
+- un turno puede durar segundos, varios minutos o quedar esperando hasta que el jugador vuelva;
+- el jugador debe tener bastante información para mirar, comparar y pensar antes de actuar;
+- la profundidad buscada viene de leer el tablero, planificar y tomar decisiones, no de reaccionar rápido;
+- cerrar el turno es una decisión explícita del jugador cuando siente que terminó;
+- inspeccionar, mover la cámara, hacer zoom, consultar reglas, revisar al rival y usar herramientas de planificación no debe consumir acciones;
+- el diseño debe funcionar especialmente bien en partidas asíncronas o semi-asíncronas entre amigos;
+- si una feature vuelve el juego más rápido pero menos reflexivo, contradice el NEXO y no debe priorizarse.
+
+Frase guía: **Guerra Mínima no intenta que juegues rápido; intenta que siempre tengas algo interesante que pensar.**
+
+## v0.6.0 — Turno sin apuro
+
+1. **6 acciones por turno:** amplían el espacio de decisión sin añadir presión temporal. El turno sólo termina cuando el jugador toca Terminar turno y confirma.
+2. **Planificación sobre el mapa:** hasta 5 marcas numeradas gratuitas por turno. Sirven como libreta táctica y no ejecutan acciones ni modifican el combate.
+3. **Parte rival navegable:** registra los movimientos importantes del último turno enemigo. Cada evento puede centrar el mapa en el sector correspondiente.
+4. **Cierre protegido:** antes de terminar se muestran acciones restantes y marcas de planificación activas.
+5. **Tutorial completo:** 12 pasos guiados explican objetivo, mapa, selección, expansión, refuerzo, movimiento, combate, economía, planificación, lectura rival, cierre del turno y victoria.
+6. **Reglas separadas del tutorial:** el tutorial enseña el flujo; la guía queda disponible como referencia rápida dentro de la partida.
+
+La demo sigue siendo local contra IA. La arquitectura futura de multiplayer debe preservar exactamente este ritmo: una partida puede esperar indefinidamente al jugador activo sin castigos por demora.
+
+
 ## v0.5.0 — Puntos calientes y mapa despejado
 
 1. **Tres puestos estratégicos:** Paso Oeste (12,14), Valle Central (20,14), Paso Este (27,14), coordenadas internas desde 0. Cada puesto genera +¤2 por turno para su dueño.
