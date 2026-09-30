@@ -23,10 +23,13 @@ Frase guía: **Guerra Mínima no intenta que juegues rápido; intenta que siempr
 
 1. **6 acciones por turno:** amplían el espacio de decisión sin añadir presión temporal. El turno sólo termina cuando el jugador toca Terminar turno y confirma.
 2. **Planificación sobre el mapa:** hasta 5 marcas numeradas gratuitas por turno. Sirven como libreta táctica y no ejecutan acciones ni modifican el combate.
-3. **Parte rival navegable:** registra los movimientos importantes del último turno enemigo. Cada evento puede centrar el mapa en el sector correspondiente.
-4. **Cierre protegido:** antes de terminar se muestran acciones restantes y marcas de planificación activas.
-5. **Tutorial completo:** 12 pasos guiados explican objetivo, mapa, selección, expansión, refuerzo, movimiento, combate, economía, planificación, lectura rival, cierre del turno y victoria.
-6. **Reglas separadas del tutorial:** el tutorial enseña el flujo; la guía queda disponible como referencia rápida dentro de la partida.
+3. **Parte rival navegable:** conserva hasta 5 rondas recientes del enemigo. Cada evento puede centrar el mapa en el sector correspondiente.
+4. **Movimiento con vista previa:** una sola acción puede trasladar varias tropas entre territorios vecinos; antes de confirmar se ve cuántas quedan y cuántas llegan.
+5. **Ataques confirmados:** antes de tirar se muestran origen, fuerzas, fortificación y probabilidad. Cancelar no gasta acción.
+6. **Cuartel más importante:** reforzar cualquier sector da +1 tropa; reforzar tu cuartel da +2. En ambos casos no cuesta monedas.
+7. **Cierre protegido:** antes de terminar se muestran acciones restantes y marcas de planificación activas.
+8. **Tutorial completo:** 12 pasos guiados explican objetivo, mapa, selección, expansión, refuerzo, movimiento, combate, economía, planificación, lectura rival, cierre del turno y victoria.
+9. **Reglas separadas del tutorial:** el tutorial enseña el flujo; la guía queda disponible como referencia rápida dentro de la partida.
 
 La demo sigue siendo local contra IA. La arquitectura futura de multiplayer debe preservar exactamente este ritmo: una partida puede esperar indefinidamente al jugador activo sin castigos por demora.
 
@@ -59,9 +62,9 @@ Si el rival conquista tu cuartel o alcanza antes el 60%, perdés.
 Cada jugador tiene 6 acciones por turno y no hay temporizador ni cierre automático. Las acciones posibles son:
 
 - **Expandir:** ocupar una casilla neutral adyacente. Requiere que un territorio propio vecino tenga al menos 2 tropas; 1 tropa pasa al territorio nuevo.
-- **Reforzar:** cuesta ¤2 y agrega 1 tropa al territorio seleccionado.
-- **Mover:** mueve 1 tropa entre dos territorios propios adyacentes. El territorio de origen debe conservar al menos 1.
-- **Atacar:** ataca un territorio rival adyacente desde el territorio propio vecino con más tropas disponibles.
+- **Reforzar:** no cuesta monedas. Agrega +1 tropa a un territorio propio o +2 si reforzás el cuartel. Consume 1 acción.
+- **Mover:** traslada la cantidad elegida de tropas entre dos territorios propios adyacentes en una sola acción. La vista previa muestra el resultado y el origen debe conservar al menos 1 tropa.
+- **Atacar:** prepara un ataque contra un territorio rival adyacente desde tu vecino con más tropas. Antes de confirmar muestra fuerzas, fortificación y probabilidad; recién al confirmar se tira y se consume la acción.
 
 ### Combate
 
@@ -80,7 +83,7 @@ Al comenzar cada turno se reciben monedas según la cantidad de territorios cont
 
 `max(2, floor(territorios / 5))`
 
-Las monedas se usan para reforzar tropas. Se eliminaron mercado, comida, madera, piedra, metal, recolección y ruinas como mecánicas jugables.
+Las tropas normales no cuestan monedas. Las monedas quedan para opciones especiales como fortificar. Se eliminaron mercado, comida, madera, piedra, metal, recolección y ruinas como mecánicas jugables.
 
 ### Leer al rival
 
@@ -88,7 +91,7 @@ Las tropas son visibles sobre cada territorio.
 
 - borde blanco punteado: territorio neutral que podés ocupar;
 - borde rojo punteado: territorio rival que podés atacar;
-- al terminar el turno rival aparece un resumen de sus movimientos;
+- el botón **RIVAL** conserva un historial navegable de hasta 5 rondas recientes y permite saltar al sector de cada evento;
 - una acumulación de tropas cerca de tu frontera o cuartel representa una amenaza inmediata.
 
 El rival automático usa las mismas ideas básicas: expandirse, reforzar, mover tropas y atacar.
