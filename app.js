@@ -1,0 +1,714 @@
+const VERSION = "0.1.0";
+const SAVE_KEY = "guerra-minima-save-v1";
+const W = 40;
+const H = 28;
+const TW = 48;
+const TH = 24;
+const MAX_AP = 3;
+const MAX_TRADES = 3;
+
+const COUNTRIES = [
+["Afganistán","AF"],["Albania","AL"],["Alemania","DE"],["Andorra","AD"],["Angola","AO"],["Antigua y Barbuda","AG"],["Arabia Saudita","SA"],["Argelia","DZ"],["Argentina","AR"],["Armenia","AM"],["Australia","AU"],["Austria","AT"],["Azerbaiyán","AZ"],["Bahamas","BS"],["Bangladés","BD"],["Barbados","BB"],["Baréin","BH"],["Bélgica","BE"],["Belice","BZ"],["Benín","BJ"],["Bielorrusia","BY"],["Birmania","MM"],["Bolivia","BO"],["Bosnia y Herzegovina","BA"],["Botsuana","BW"],["Brasil","BR"],["Brunéi","BN"],["Bulgaria","BG"],["Burkina Faso","BF"],["Burundi","BI"],["Bután","BT"],["Cabo Verde","CV"],["Camboya","KH"],["Camerún","CM"],["Canadá","CA"],["Catar","QA"],["Chad","TD"],["Chile","CL"],["China","CN"],["Chipre","CY"],["Colombia","CO"],["Comoras","KM"],["Corea del Norte","KP"],["Corea del Sur","KR"],["Costa de Marfil","CI"],["Costa Rica","CR"],["Croacia","HR"],["Cuba","CU"],["Dinamarca","DK"],["Dominica","DM"],["Ecuador","EC"],["Egipto","EG"],["El Salvador","SV"],["Emiratos Árabes Unidos","AE"],["Eritrea","ER"],["Eslovaquia","SK"],["Eslovenia","SI"],["España","ES"],["Estados Unidos","US"],["Estonia","EE"],["Esuatini","SZ"],["Etiopía","ET"],["Filipinas","PH"],["Finlandia","FI"],["Fiyi","FJ"],["Francia","FR"],["Gabón","GA"],["Gambia","GM"],["Georgia","GE"],["Ghana","GH"],["Granada","GD"],["Grecia","GR"],["Guatemala","GT"],["Guinea","GN"],["Guinea-Bisáu","GW"],["Guinea Ecuatorial","GQ"],["Guyana","GY"],["Haití","HT"],["Honduras","HN"],["Hungría","HU"],["India","IN"],["Indonesia","ID"],["Irak","IQ"],["Irán","IR"],["Irlanda","IE"],["Islandia","IS"],["Islas Marshall","MH"],["Islas Salomón","SB"],["Israel","IL"],["Italia","IT"],["Jamaica","JM"],["Japón","JP"],["Jordania","JO"],["Kazajistán","KZ"],["Kenia","KE"],["Kirguistán","KG"],["Kiribati","KI"],["Kuwait","KW"],["Laos","LA"],["Lesoto","LS"],["Letonia","LV"],["Líbano","LB"],["Liberia","LR"],["Libia","LY"],["Liechtenstein","LI"],["Lituania","LT"],["Luxemburgo","LU"],["Macedonia del Norte","MK"],["Madagascar","MG"],["Malasia","MY"],["Malaui","MW"],["Maldivas","MV"],["Malí","ML"],["Malta","MT"],["Marruecos","MA"],["Mauricio","MU"],["Mauritania","MR"],["México","MX"],["Micronesia","FM"],["Moldavia","MD"],["Mónaco","MC"],["Mongolia","MN"],["Montenegro","ME"],["Mozambique","MZ"],["Namibia","NA"],["Nauru","NR"],["Nepal","NP"],["Nicaragua","NI"],["Níger","NE"],["Nigeria","NG"],["Noruega","NO"],["Nueva Zelanda","NZ"],["Omán","OM"],["Países Bajos","NL"],["Pakistán","PK"],["Palaos","PW"],["Palestina","PS"],["Panamá","PA"],["Papúa Nueva Guinea","PG"],["Paraguay","PY"],["Perú","PE"],["Polonia","PL"],["Portugal","PT"],["Reino Unido","GB"],["República Centroafricana","CF"],["República Checa","CZ"],["República del Congo","CG"],["República Democrática del Congo","CD"],["República Dominicana","DO"],["Ruanda","RW"],["Rumania","RO"],["Rusia","RU"],["Samoa","WS"],["San Cristóbal y Nieves","KN"],["San Marino","SM"],["San Vicente y las Granadinas","VC"],["Santa Lucía","LC"],["Santo Tomé y Príncipe","ST"],["Senegal","SN"],["Serbia","RS"],["Seychelles","SC"],["Sierra Leona","SL"],["Singapur","SG"],["Siria","SY"],["Somalia","SO"],["Sri Lanka","LK"],["Sudáfrica","ZA"],["Sudán","SD"],["Sudán del Sur","SS"],["Suecia","SE"],["Suiza","CH"],["Surinam","SR"],["Tailandia","TH"],["Tanzania","TZ"],["Tayikistán","TJ"],["Timor Oriental","TL"],["Togo","TG"],["Tonga","TO"],["Trinidad y Tobago","TT"],["Túnez","TN"],["Turkmenistán","TM"],["Turquía","TR"],["Tuvalu","TV"],["Ucrania","UA"],["Uganda","UG"],["Uruguay","UY"],["Uzbekistán","UZ"],["Vanuatu","VU"],["Vaticano","VA"],["Venezuela","VE"],["Vietnam","VN"],["Yemen","YE"],["Yibuti","DJ"],["Zambia","ZM"],["Zimbabue","ZW"]
+];
+
+const TERRAIN_LABELS = {
+  water:"Costa",
+  plains:"Llanura",
+  valley:"Valle fértil",
+  forest:"Bosque",
+  hills:"Colinas",
+  scrub:"Matorral"
+};
+
+const PRICES = { food:2, wood:3, stone:4, metal:6 };
+const RES_LABELS = {
+  food:["🌾","Comida"],
+  wood:["🪵","Madera"],
+  stone:["🪨","Piedra"],
+  metal:["⛓","Metal"],
+  money:["¤","Dinero"]
+};
+
+const el = (id) => document.getElementById(id);
+const canvas = el("world");
+const ctx = canvas.getContext("2d", { alpha:false });
+const mapShell = el("mapShell");
+let viewW = 1;
+let viewH = 1;
+let dpr = 1;
+let selected = null;
+let terrain = [];
+let state = null;
+let camera = { x:0, y:-70 };
+let dragging = false;
+let moved = false;
+let pointerStart = null;
+let cameraStart = null;
+let lastFrame = 0;
+let toastTimer = null;
+
+function flag(code) {
+  return String.fromCodePoint(...code.toUpperCase().split("").map((c) => 127397 + c.charCodeAt(0)));
+}
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function() {
+    a |= 0;
+    a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function hash(seed, x, y) {
+  let n = (seed ^ Math.imul(x + 37, 374761393) ^ Math.imul(y + 101, 668265263)) >>> 0;
+  n = Math.imul(n ^ n >>> 13, 1274126177);
+  return ((n ^ n >>> 16) >>> 0) / 4294967295;
+}
+
+function idx(x, y) { return y * W + x; }
+function xy(i) { return { x:i % W, y:Math.floor(i / W) }; }
+function inside(x, y) { return x >= 0 && y >= 0 && x < W && y < H; }
+function isLand(i) { return terrain[i] !== "water"; }
+
+function neighbors(i) {
+  const p = xy(i);
+  const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+  return dirs.map((d) => ({x:p.x+d[0], y:p.y+d[1]}))
+    .filter((q) => inside(q.x,q.y)).map((q) => idx(q.x,q.y));
+}
+
+function adjacentOwner(i, owner) {
+  return neighbors(i).some((n) => state.cells[n].owner === owner);
+}
+
+function generateTerrain(seed) {
+  const out = new Array(W * H);
+  const cx = (W - 1) / 2;
+  const cy = (H - 1) / 2;
+  for (let y=0; y<H; y++) {
+    for (let x=0; x<W; x++) {
+      const i = idx(x,y);
+      const ex = (x-cx)/(W*.52);
+      const ey = (y-cy)/(H*.56);
+      const edge = ex*ex + ey*ey;
+      if (edge > 1 || (edge > .82 && hash(seed,x,y) > .45)) {
+        out[i] = "water";
+        continue;
+      }
+      const r = hash(seed,x,y);
+      const valleyDist = Math.abs(x - cx + Math.sin(y*.55)*1.2);
+      if (valleyDist < 3.1) out[i] = r < .12 ? "scrub" : "valley";
+      else if (r < .20) out[i] = "forest";
+      else if (r > .84) out[i] = "hills";
+      else if (r < .29) out[i] = "scrub";
+      else out[i] = "plains";
+    }
+  }
+  const force = [[6,Math.floor(H/2)],[W-7,Math.floor(H/2)]];
+  force.forEach((p) => {
+    for (let yy=p[1]-3; yy<=p[1]+3; yy++) for (let xx=p[0]-3; xx<=p[0]+3; xx++) {
+      if (inside(xx,yy)) out[idx(xx,yy)] = hash(seed,xx,yy) > .72 ? "forest" : "plains";
+    }
+  });
+  return out;
+}
+
+function conflictName(seed) {
+  const a = ["Conflicto","Disputa","Guerra","Crisis","Incidente"];
+  const b = ["del Valle","del Paso","de las Ruinas","de la Cuenca","de las Dos Colinas","del Río Seco","de la Frontera"];
+  const c = ["Ceniza","Baja","Vieja","del Norte","Gris","de Aram","del Ciervo","de Piedra","Clara","del Viento"];
+  const r = mulberry32(seed ^ 0x4a39b70d);
+  return a[Math.floor(r()*a.length)] + " " + b[Math.floor(r()*b.length)] + " " + c[Math.floor(r()*c.length)];
+}
+
+function newState() {
+  const seed = (crypto.getRandomValues(new Uint32Array(1))[0]) >>> 0;
+  terrain = generateTerrain(seed);
+  const r = mulberry32(seed);
+  const pIndex = Math.floor(r()*COUNTRIES.length);
+  let eIndex = Math.floor(r()*COUNTRIES.length);
+  if (eIndex === pIndex) eIndex = (eIndex + 1) % COUNTRIES.length;
+  const playerCapital = idx(6, Math.floor(H/2));
+  const enemyCapital = idx(W-7, Math.floor(H/2));
+  const cells = new Array(W*H).fill(null).map(() => ({ owner:null, building:null, ruin:false, explored:false }));
+
+  function claimAround(center, owner) {
+    const p = xy(center);
+    for (let y=p.y-2; y<=p.y+2; y++) for (let x=p.x-2; x<=p.x+2; x++) {
+      if (!inside(x,y)) continue;
+      const i = idx(x,y);
+      if (isLand(i) && Math.abs(x-p.x)+Math.abs(y-p.y) <= 3) cells[i].owner = owner;
+    }
+  }
+  claimAround(playerCapital, "p");
+  claimAround(enemyCapital, "ai");
+  cells[playerCapital].building = "capital";
+  cells[enemyCapital].building = "capital";
+
+  let ruins = 0;
+  let guard = 0;
+  while (ruins < 11 && guard < 1000) {
+    guard++;
+    const x = 10 + Math.floor(r()*(W-20));
+    const y = 3 + Math.floor(r()*(H-6));
+    const i = idx(x,y);
+    if (isLand(i) && !cells[i].owner && !cells[i].ruin) {
+      cells[i].ruin = true;
+      ruins++;
+    }
+  }
+
+  return {
+    schema:1,
+    version:VERSION,
+    seed,
+    name:conflictName(seed),
+    playerCountry:COUNTRIES[pIndex],
+    enemyCountry:COUNTRIES[eIndex],
+    playerCapital,
+    enemyCapital,
+    cells,
+    ap:MAX_AP,
+    trades:0,
+    day:1,
+    turn:1,
+    resources:{ food:12, wood:10, stone:8, metal:3, money:22 },
+    aiResources:{ food:12, wood:10, stone:8, metal:3, money:22 },
+    log:["El continente fue reclamado por dos países."]
+  };
+}
+
+function save() {
+  localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.schema !== 1 || !Array.isArray(parsed.cells) || parsed.cells.length !== W*H) return false;
+    state = parsed;
+    terrain = generateTerrain(state.seed);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resetGame() {
+  state = newState();
+  selected = null;
+  camera = {x:0,y:-70};
+  save();
+  syncUI();
+  closeDialog("menu");
+  toast("Nuevo continente generado.");
+}
+
+function syncUI() {
+  el("warName").textContent = state.name;
+  el("playerCountry").textContent = state.playerCountry[0];
+  el("enemyCountry").textContent = state.enemyCountry[0];
+  el("playerFlag").textContent = flag(state.playerCountry[1]);
+  el("enemyFlag").textContent = flag(state.enemyCountry[1]);
+  el("dayLabel").textContent = "Día " + state.day + " · T" + state.turn;
+  el("apLabel").textContent = state.ap + "/" + MAX_AP;
+  el("versionLabel").textContent = "v" + VERSION;
+  el("lastEvent").textContent = state.log[0] || "Elegí hasta 3 acciones.";
+
+  el("resources").innerHTML = ["food","wood","stone","metal","money"].map((key) => {
+    return '<div class="resource"><span>' + RES_LABELS[key][0] + '</span><b>' + state.resources[key] + '</b></div>';
+  }).join("");
+
+  updateSelectionUI();
+  renderMarket();
+}
+
+function ownerLabel(owner) {
+  if (owner === "p") return state.playerCountry[0];
+  if (owner === "ai") return state.enemyCountry[0];
+  return "Territorio neutral";
+}
+
+function updateSelectionUI() {
+  if (selected == null) {
+    el("selectionTitle").textContent = "Tocá una zona del mapa";
+    el("selectionMeta").textContent = "El mundo sigue vivo mientras decidís.";
+  } else {
+    const c = state.cells[selected];
+    const pos = xy(selected);
+    let title = TERRAIN_LABELS[terrain[selected]];
+    if (c.building === "capital") title = "Capital de " + ownerLabel(c.owner);
+    else if (c.building === "village") title = "Asentamiento de " + ownerLabel(c.owner);
+    else if (c.building === "outpost") title = "Puesto fronterizo de " + ownerLabel(c.owner);
+    else if (c.ruin && !c.explored) title = "Ruinas antiguas";
+    const bits = [ownerLabel(c.owner), "sector " + (pos.x+1) + "." + (pos.y+1)];
+    if (c.ruin && c.explored) bits.push("ruinas exploradas");
+    el("selectionTitle").textContent = title;
+    el("selectionMeta").textContent = bits.join(" · ");
+  }
+
+  document.querySelectorAll(".actions button").forEach((button) => {
+    button.disabled = !canAction(button.dataset.action);
+  });
+}
+
+function enough(cost) {
+  return Object.entries(cost).every(([k,v]) => state.resources[k] >= v);
+}
+
+function canAction(action) {
+  if (state.ap <= 0 || selected == null) return false;
+  const c = state.cells[selected];
+  if (action === "expand") return isLand(selected) && c.owner === null && adjacentOwner(selected,"p") && enough({food:2});
+  if (action === "build") return c.owner === "p" && !c.building && enough({wood:6,stone:3,money:4});
+  if (action === "harvest") return c.owner === "p";
+  if (action === "explore") return c.ruin && !c.explored && (c.owner === "p" || (c.owner === null && adjacentOwner(selected,"p")));
+  if (action === "attack") return c.owner === "ai" && adjacentOwner(selected,"p") && c.building !== "capital" && enough({food:3,metal:1});
+  return false;
+}
+
+function spend(cost) {
+  Object.entries(cost).forEach(([k,v]) => state.resources[k] -= v);
+}
+
+function addLog(text) {
+  state.log.unshift(text);
+  state.log = state.log.slice(0,8);
+  el("lastEvent").textContent = text;
+}
+
+function useAction() {
+  state.ap = Math.max(0, state.ap - 1);
+}
+
+function act(action) {
+  if (!canAction(action)) {
+    toast("Esa acción no está disponible en la zona seleccionada.");
+    return;
+  }
+  const c = state.cells[selected];
+  const t = terrain[selected];
+
+  if (action === "expand") {
+    spend({food:2});
+    c.owner = "p";
+    addLog("Tu frontera avanzó hacia " + TERRAIN_LABELS[t].toLowerCase() + ".");
+  }
+
+  if (action === "build") {
+    spend({wood:6,stone:3,money:4});
+    c.building = adjacentOwner(selected,"ai") ? "outpost" : "village";
+    addLog(c.building === "outpost" ? "Levantaste un puesto fronterizo." : "Fundaste un pequeño asentamiento.");
+  }
+
+  if (action === "harvest") {
+    const gain = t === "forest" ? {wood:5,food:1} :
+      t === "hills" ? {stone:4,metal:1} :
+      t === "valley" ? {food:5,wood:1} :
+      t === "scrub" ? {wood:2,stone:2} : {food:3,wood:1};
+    Object.entries(gain).forEach(([k,v]) => state.resources[k] += v);
+    addLog("Desarrollaste la zona y sumaste recursos.");
+  }
+
+  if (action === "explore") {
+    c.explored = true;
+    if (!c.owner) c.owner = "p";
+    const r = mulberry32((state.seed ^ selected ^ state.turn * 7919) >>> 0);
+    const bonus = 5 + Math.floor(r()*7);
+    state.resources.money += bonus;
+    if (r() > .5) state.resources.metal += 2; else state.resources.stone += 3;
+    addLog("Exploraste las ruinas: encontraste bienes por ¤" + bonus + ".");
+  }
+
+  if (action === "attack") {
+    spend({food:3,metal:1});
+    const chance = c.building ? .48 : .68;
+    if (Math.random() < chance) {
+      c.owner = "p";
+      if (c.building === "village") c.building = "outpost";
+      addLog("La intervención avanzó: el sector cambió de control.");
+    } else {
+      addLog("La intervención fracasó. La frontera no se movió.");
+    }
+  }
+
+  useAction();
+  save();
+  syncUI();
+}
+
+function renderMarket() {
+  const rows = Object.keys(PRICES).map((key) => {
+    const label = RES_LABELS[key][1];
+    const icon = RES_LABELS[key][0];
+    const buy = PRICES[key];
+    const sell = Math.max(1, Math.floor(buy*.6));
+    return '<div class="market-row"><div><strong>' + icon + ' ' + label + '</strong><small>Tenés ' + state.resources[key] + ' · compra ¤' + buy + ' · venta ¤' + sell + '</small></div>' +
+      '<button data-buy="' + key + '">Comprar</button><button data-sell="' + key + '">Vender</button></div>';
+  }).join("");
+  el("marketRows").innerHTML = rows;
+  el("tradeCount").textContent = state.trades + " / " + MAX_TRADES + " operaciones";
+  el("marketRows").querySelectorAll("button").forEach((b) => {
+    const key = b.dataset.buy || b.dataset.sell;
+    const buy = !!b.dataset.buy;
+    b.disabled = state.trades >= MAX_TRADES || (buy ? state.resources.money < PRICES[key] : state.resources[key] <= 0);
+    b.addEventListener("click", () => trade(key,buy));
+  });
+}
+
+function trade(key, buy) {
+  if (state.trades >= MAX_TRADES) return;
+  const price = PRICES[key];
+  if (buy) {
+    if (state.resources.money < price) return;
+    state.resources.money -= price;
+    state.resources[key] += 1;
+    addLog("Compraste 1 " + RES_LABELS[key][1].toLowerCase() + ".");
+  } else {
+    if (state.resources[key] <= 0) return;
+    state.resources[key] -= 1;
+    state.resources.money += Math.max(1,Math.floor(price*.6));
+    addLog("Vendiste 1 " + RES_LABELS[key][1].toLowerCase() + ".");
+  }
+  state.trades++;
+  save();
+  syncUI();
+}
+
+function aiTurn() {
+  let note = [];
+  for (let move=0; move<MAX_AP; move++) {
+    const attackables = [];
+    const expandables = [];
+    const buildables = [];
+    for (let i=0; i<state.cells.length; i++) {
+      const c = state.cells[i];
+      if (!isLand(i)) continue;
+      if (c.owner === "p" && c.building !== "capital" && adjacentOwner(i,"ai")) attackables.push(i);
+      if (c.owner === null && adjacentOwner(i,"ai")) expandables.push(i);
+      if (c.owner === "ai" && !c.building) buildables.push(i);
+    }
+
+    if (attackables.length && Math.random() < .42) {
+      const i = attackables[Math.floor(Math.random()*attackables.length)];
+      if (Math.random() < .58) {
+        state.cells[i].owner = "ai";
+        if (state.cells[i].building === "village") state.cells[i].building = "outpost";
+        note.push("avanzó sobre tu frontera");
+      } else note.push("intentó intervenir una frontera");
+      continue;
+    }
+
+    if (expandables.length && Math.random() < .78) {
+      expandables.sort((a,b) => xy(a).x - xy(b).x);
+      const pool = expandables.slice(0,Math.min(7,expandables.length));
+      const i = pool[Math.floor(Math.random()*pool.length)];
+      state.cells[i].owner = "ai";
+      note.push("expandió territorio");
+      continue;
+    }
+
+    if (buildables.length) {
+      const i = buildables[Math.floor(Math.random()*buildables.length)];
+      state.cells[i].building = adjacentOwner(i,"p") ? "outpost" : "village";
+      note.push("levantó un asentamiento");
+    }
+  }
+  return note;
+}
+
+function endTurn() {
+  const note = aiTurn();
+  state.turn++;
+  state.day++;
+  state.ap = MAX_AP;
+  state.trades = 0;
+  const summary = note.length ? state.enemyCountry[0] + " " + note.slice(0,2).join(" y ") + "." : state.enemyCountry[0] + " consolidó su territorio.";
+  addLog(summary + " Es tu turno.");
+  save();
+  syncUI();
+  toast("Es tu turno contra " + state.enemyCountry[0] + ".");
+}
+
+function terrainColor(t, x, y) {
+  const v = hash(state.seed ^ 0xabc123, x, y);
+  if (t === "water") return v > .5 ? "#7899a0" : "#73929a";
+  if (t === "valley") return v > .5 ? "#9da66b" : "#a6ae75";
+  if (t === "forest") return v > .5 ? "#667c58" : "#6d835e";
+  if (t === "hills") return v > .5 ? "#a89670" : "#9f8d69";
+  if (t === "scrub") return v > .5 ? "#9b9c73" : "#92966e";
+  return v > .5 ? "#aab47f" : "#b2bb87";
+}
+
+function iso(x,y) {
+  return {
+    x:(x-y)*(TW/2) + viewW/2 + camera.x,
+    y:(x+y)*(TH/2) + 28 + camera.y
+  };
+}
+
+function screenToTile(sx,sy) {
+  const px = sx - viewW/2 - camera.x;
+  const py = sy - 28 - camera.y;
+  const x = Math.floor(px/TW + py/TH);
+  const y = Math.floor(py/TH - px/TW);
+  if (!inside(x,y)) return null;
+  return idx(x,y);
+}
+
+function diamond(p, fill, stroke) {
+  ctx.beginPath();
+  ctx.moveTo(p.x,p.y);
+  ctx.lineTo(p.x+TW/2,p.y+TH/2);
+  ctx.lineTo(p.x,p.y+TH);
+  ctx.lineTo(p.x-TW/2,p.y+TH/2);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if (stroke) {
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+}
+
+function drawTree(x,y,s) {
+  ctx.fillStyle = "#425d41";
+  ctx.beginPath(); ctx.arc(x,y,3.5*s,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = "#334b35";
+  ctx.beginPath(); ctx.arc(x+2*s,y-2*s,3*s,0,Math.PI*2); ctx.fill();
+}
+
+function drawRuin(x,y,explored) {
+  ctx.fillStyle = explored ? "#756f60" : "#625c50";
+  ctx.fillRect(x-5,y-8,4,8);
+  ctx.fillRect(x+1,y-11,5,11);
+  ctx.fillStyle = "#c5b89a";
+  ctx.fillRect(x+2,y-9,2,2);
+}
+
+function drawBuilding(x,y,type,owner,time,i) {
+  const base = owner === "p" ? "#d9c978" : "#b46f67";
+  const roof = owner === "p" ? "#78672d" : "#6d3531";
+  const scale = type === "capital" ? 1.35 : 1;
+  ctx.fillStyle = base;
+  ctx.fillRect(x-7*scale,y-10*scale,14*scale,10*scale);
+  ctx.fillStyle = roof;
+  ctx.beginPath();
+  ctx.moveTo(x-9*scale,y-10*scale);
+  ctx.lineTo(x,y-17*scale);
+  ctx.lineTo(x+9*scale,y-10*scale);
+  ctx.closePath(); ctx.fill();
+
+  if (type === "outpost") {
+    ctx.strokeStyle = "#3b3426"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x+8,y-2); ctx.lineTo(x+8,y-20); ctx.stroke();
+    ctx.fillStyle = owner === "p" ? "#e8da82" : "#cb6c64";
+    ctx.fillRect(x+8,y-20,8,5);
+  }
+
+  if (type === "capital") {
+    ctx.strokeStyle = "#3b3426"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x+10,y-2); ctx.lineTo(x+10,y-26); ctx.stroke();
+    ctx.font = "18px system-ui";
+    ctx.textAlign = "left";
+    ctx.fillText(flag(owner === "p" ? state.playerCountry[1] : state.enemyCountry[1]),x+8,y-17);
+  }
+
+  const puff = (time/900 + i*.37) % 1;
+  ctx.fillStyle = "rgba(80,75,65," + (0.22*(1-puff)) + ")";
+  ctx.beginPath(); ctx.arc(x-3 + Math.sin(time/600+i)*2, y-18-puff*14, 2+puff*3, 0, Math.PI*2); ctx.fill();
+}
+
+function drawAgents(x,y,owner,time,i) {
+  for (let a=0; a<2; a++) {
+    const phase = time/900 + i*.8 + a*2.4;
+    const dx = Math.sin(phase)*10 + (a ? 4 : -3);
+    const dy = Math.cos(phase*.8)*4 + 3;
+    ctx.fillStyle = owner === "p" ? "#f1df8b" : "#d77a70";
+    ctx.beginPath(); ctx.arc(x+dx,y+dy,1.8,0,Math.PI*2); ctx.fill();
+  }
+}
+
+function render(time=0) {
+  if (time - lastFrame < 32) {
+    requestAnimationFrame(render);
+    return;
+  }
+  lastFrame = time;
+  ctx.clearRect(0,0,viewW,viewH);
+  ctx.fillStyle = "#78969b";
+  ctx.fillRect(0,0,viewW,viewH);
+
+  for (let s=0; s<W+H-1; s++) {
+    for (let x=0; x<W; x++) {
+      const y = s-x;
+      if (y<0 || y>=H) continue;
+      const i = idx(x,y);
+      const p = iso(x,y);
+      if (p.x < -TW || p.x > viewW+TW || p.y < -50 || p.y > viewH+60) continue;
+      const t = terrain[i];
+      diamond(p, terrainColor(t,x,y), t === "water" ? "rgba(255,255,255,.07)" : "rgba(63,69,48,.15)");
+
+      const c = state.cells[i];
+      if (c.owner) {
+        ctx.fillStyle = c.owner === "p" ? "rgba(228,207,98,.17)" : "rgba(177,75,67,.17)";
+        ctx.beginPath();
+        ctx.moveTo(p.x,p.y+2); ctx.lineTo(p.x+TW/2-2,p.y+TH/2); ctx.lineTo(p.x,p.y+TH-2); ctx.lineTo(p.x-TW/2+2,p.y+TH/2); ctx.closePath(); ctx.fill();
+      }
+
+      if (t === "forest") {
+        const n = hash(state.seed ^ 99,x,y);
+        drawTree(p.x-7,p.y+11,.85);
+        if (n>.35) drawTree(p.x+5,p.y+8,.7);
+      }
+      if (t === "hills") {
+        ctx.fillStyle = "#81765f";
+        ctx.beginPath(); ctx.moveTo(p.x-10,p.y+13); ctx.lineTo(p.x-2,p.y+2); ctx.lineTo(p.x+5,p.y+13); ctx.fill();
+        ctx.fillStyle = "#92866a";
+        ctx.beginPath(); ctx.moveTo(p.x,p.y+13); ctx.lineTo(p.x+8,p.y+5); ctx.lineTo(p.x+13,p.y+13); ctx.fill();
+      }
+      if (c.ruin) drawRuin(p.x,p.y+10,c.explored);
+      if (c.building) {
+        drawBuilding(p.x,p.y+11,c.building,c.owner,time,i);
+        drawAgents(p.x,p.y+14,c.owner,time,i);
+      }
+
+      if (selected === i) {
+        ctx.strokeStyle = "#fff4bd";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(p.x,p.y+1); ctx.lineTo(p.x+TW/2,p.y+TH/2); ctx.lineTo(p.x,p.y+TH-1); ctx.lineTo(p.x-TW/2,p.y+TH/2); ctx.closePath(); ctx.stroke();
+      }
+    }
+  }
+
+  requestAnimationFrame(render);
+}
+
+function resize() {
+  const rect = canvas.getBoundingClientRect();
+  viewW = Math.max(1,rect.width);
+  viewH = Math.max(1,rect.height);
+  dpr = Math.min(2,window.devicePixelRatio || 1);
+  canvas.width = Math.floor(viewW*dpr);
+  canvas.height = Math.floor(viewH*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+function selectAt(clientX,clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const i = screenToTile(clientX-rect.left,clientY-rect.top);
+  if (i == null) return;
+  selected = i;
+  updateSelectionUI();
+  el("mapHint").style.opacity = "0";
+}
+
+function centerOnPlayer() {
+  const p = xy(state.playerCapital);
+  const rawX = (p.x-p.y)*(TW/2);
+  const rawY = (p.x+p.y)*(TH/2)+28;
+  camera.x = -rawX;
+  camera.y = viewH*.42 - rawY;
+}
+
+function toast(text) {
+  const t = el("toast");
+  t.textContent = text;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"),2200);
+}
+
+function closeDialog(which) {
+  const d = which === "market" ? el("marketDialog") : el("menuDialog");
+  if (d.open) d.close();
+}
+
+function bindEvents() {
+  canvas.addEventListener("pointerdown", (e) => {
+    dragging = true; moved = false;
+    pointerStart = {x:e.clientX,y:e.clientY};
+    cameraStart = {...camera};
+    canvas.setPointerCapture(e.pointerId);
+    mapShell.classList.add("dragging");
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const dx = e.clientX-pointerStart.x;
+    const dy = e.clientY-pointerStart.y;
+    if (Math.hypot(dx,dy) > 5) moved = true;
+    camera.x = cameraStart.x+dx;
+    camera.y = cameraStart.y+dy;
+  });
+  canvas.addEventListener("pointerup", (e) => {
+    if (!dragging) return;
+    dragging = false;
+    mapShell.classList.remove("dragging");
+    if (!moved) selectAt(e.clientX,e.clientY);
+  });
+  canvas.addEventListener("pointercancel", () => {
+    dragging=false; mapShell.classList.remove("dragging");
+  });
+
+  document.querySelectorAll(".actions button").forEach((b) => b.addEventListener("click",() => act(b.dataset.action)));
+  el("endTurnBtn").addEventListener("click",endTurn);
+  el("marketBtn").addEventListener("click",() => { renderMarket(); el("marketDialog").showModal(); });
+  el("menuBtn").addEventListener("click",() => el("menuDialog").showModal());
+  el("centerBtn").addEventListener("click",centerOnPlayer);
+  el("newGameBtn").addEventListener("click",resetGame);
+  document.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click",() => closeDialog(b.dataset.close)));
+  window.addEventListener("resize",resize);
+  document.addEventListener("visibilitychange",() => {
+    if (!document.hidden) checkVersion();
+  });
+}
+
+async function checkVersion() {
+  try {
+    const response = await fetch("./version.json?t="+Date.now(),{cache:"no-store"});
+    if (!response.ok) return;
+    const remote = await response.json();
+    if (remote.version && remote.version !== VERSION) el("updateOverlay").hidden = false;
+  } catch {}
+}
+
+async function cleanReload() {
+  if ("serviceWorker" in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map((r) => r.update().catch(()=>{})));
+  }
+  if ("caches" in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  }
+  location.reload();
+}
+
+async function boot() {
+  if (!load()) {
+    state = newState();
+    save();
+  }
+  terrain = generateTerrain(state.seed);
+  resize();
+  centerOnPlayer();
+  bindEvents();
+  syncUI();
+  requestAnimationFrame(render);
+  checkVersion();
+  setInterval(checkVersion,60000);
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(()=>{});
+  }
+  el("updateBtn").addEventListener("click",cleanReload);
+}
+
+boot();
