@@ -1,5 +1,5 @@
-const CACHE = "guerra-minima-v0.7.0";
-const CORE = ["./", "./index.html", "./style.css?v=0.7.0", "./app.js?v=0.7.0", "./manifest.webmanifest"];
+const CACHE = "guerra-minima-v0.8.0";
+const CORE = ["./", "./index.html", "./style.css?v=0.8.0", "./app.js?v=0.8.0", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
